@@ -2,15 +2,17 @@
 
 /* Bordm — daily vowel-restoration puzzle.
  * Puzzle source: Wikimedia pageviews API (CORS-open, finalized daily).
- * One global game day, flipping at midnight US-Pacific; the same game date
- * always yields the same puzzle for every player everywhere. */
+ * The game day is the player's local calendar date (rolls over at their
+ * midnight, like NYT games); the puzzle is a pure function of that date,
+ * so everyone on a given date gets the same puzzle. */
 
 const VOWELS = "AEIOU";
 const MAX_CHECKS = 4;
 const EPOCH_UTC = Date.UTC(2026, 7, 1); // game date 2026-08-01 = Bordm #1
 /* Finalized daily pageview rankings — immutable once published, unlike the
  * featured-content feed, whose sections mutate during the day. We read the
- * date two UTC days back so the data is guaranteed complete. */
+ * date three days back: finalized data must exist the moment a date begins
+ * in UTC+14, which is only ~26h after that source day ended. */
 const TOP_URL = (y, m, d) =>
   `https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access/${y}/${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}`;
 const SUMMARY_URL = (title) =>
@@ -61,15 +63,9 @@ function xmur3(str) {
 
 /* ---------- puzzle derivation ---------- */
 
-/* The game day flips at midnight US-Pacific — a fixed wall clock everyone
- * shares, not each player's local midnight. Browsers ship the IANA timezone
- * database, so this is as deterministic as UTC math. */
-const GAME_TZ = "America/Los_Angeles";
-
 function todayGameDate() {
-  const [y, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone: GAME_TZ })
-    .format(new Date()).split("-").map(Number);
-  return { y, m, d };
+  const now = new Date();
+  return { y: now.getFullYear(), m: now.getMonth() + 1, d: now.getDate() };
 }
 
 function dateKey({ y, m, d }) {
@@ -133,7 +129,7 @@ function answerWords(answer) {
 }
 
 async function fetchCandidates(forDate) {
-  const src = minusDays(forDate, 2);
+  const src = minusDays(forDate, 3);
   const res = await fetch(TOP_URL(src.y, src.m, src.d), { headers: { Accept: "application/json" } });
   if (!res.ok) throw new Error("pageviews " + res.status);
   return candidatesFromTop(await res.json());
@@ -447,10 +443,8 @@ function showModal() {
 }
 
 function tickCountdown() {
-  const t = new Intl.DateTimeFormat("en-GB", {
-    timeZone: GAME_TZ, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
-  }).format(new Date()).split(":").map(Number);
-  const ms = ((24 - t[0]) * 3600 - t[1] * 60 - t[2]) * 1000;
+  const now = new Date();
+  const ms = new Date(now.getFullYear(), now.getMonth(), now.getDate() + 1) - now;
   const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), sec = Math.floor((ms % 60000) / 1000);
   const el = $("countdown");
   if (el) el.textContent = `${h}h ${m}m ${sec}s`;
