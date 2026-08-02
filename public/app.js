@@ -142,6 +142,12 @@ function pickFor(key, cands) {
   return cands[rand() % cands.length];
 }
 
+/* COMPATIBILITY CONTRACT: the puzzle number and answer both derive from the
+ * calendar date, and players compare results by number. Any change to the
+ * selection pipeline (filters, blacklist, variety rule, data offset, seed)
+ * silently renames every date's puzzle. If the pipeline must change, gate the
+ * new behavior on a cutover date (e.g. `if (key >= "2026-09-01")`) so dates
+ * that have already been played keep their identity. */
 async function loadPuzzle() {
   const today = todayGameDate();
   const key = dateKey(today);

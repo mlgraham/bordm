@@ -19,6 +19,10 @@ bordm.com
 - If the API is unreachable, a bundled list of idioms (picked by the same date seed) keeps the game playable offline.
 - Streaks and stats live in `localStorage`.
 
+## Contributing note
+
+The puzzle number and answer both derive deterministically from the calendar date, and players compare results by number. **Changing any part of the selection pipeline (filters, variety rule, data offset, seed) renames every date's puzzle.** If you change the pipeline, gate the new behavior on a cutover date so already-played dates keep their identity.
+
 ## Develop
 
 Serve `public/` with any static file server, e.g.:
