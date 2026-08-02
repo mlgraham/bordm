@@ -121,6 +121,22 @@ function minusDays({ y, m, d }, n) {
   return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() };
 }
 
+function answerWords(answer) {
+  return answer.split(/[^A-Z]+/).filter((w) => w.length > 3);
+}
+
+async function fetchCandidates(forDate) {
+  const src = minusDays(forDate, 2);
+  const res = await fetch(TOP_URL(src.y, src.m, src.d), { headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error("pageviews " + res.status);
+  return candidatesFromTop(await res.json());
+}
+
+function pickFor(key, cands) {
+  const rand = xmur3("bordm-" + key);
+  return cands[rand() % cands.length];
+}
+
 async function loadPuzzle() {
   const utc = todayUTC();
   const key = dateKey(utc);
@@ -133,15 +149,24 @@ async function loadPuzzle() {
     if (cached && cached.key === key && cached.answer) return cached;
   } catch { /* ignore corrupt cache */ }
 
-  const rand = xmur3("bordm-" + key);
   let puzzle;
   try {
-    const src = minusDays(utc, 2);
-    const res = await fetch(TOP_URL(src.y, src.m, src.d), { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("pageviews " + res.status);
-    const cands = candidatesFromTop(await res.json());
+    let cands = await fetchCandidates(utc);
     if (!cands.length) throw new Error("no candidates");
-    const pick = cands[rand() % cands.length];
+    /* Variety: a blockbuster can top the charts for days, so exclude
+     * candidates sharing a significant word with yesterday's pick.
+     * Yesterday's pick is recomputed here with the same seeded algorithm
+     * (one level deep, unfiltered), keeping today fully deterministic. */
+    try {
+      const yKey = dateKey(minusDays(utc, 1));
+      const yCands = await fetchCandidates(minusDays(utc, 1));
+      if (yCands.length) {
+        const avoid = new Set(answerWords(pickFor(yKey, yCands).answer));
+        const varied = cands.filter((c) => !answerWords(c.answer).some((w) => avoid.has(w)));
+        if (varied.length) cands = varied;
+      }
+    } catch { /* variety data unavailable — proceed unfiltered */ }
+    const pick = pickFor(key, cands);
     let clue = pick.hint || "In the news";
     try {
       const s = await fetch(SUMMARY_URL(pick.raw), { headers: { Accept: "application/json" } });
@@ -160,7 +185,7 @@ async function loadPuzzle() {
     try { localStorage.setItem("bordm-puzzle", JSON.stringify(puzzle)); } catch { /* private mode */ }
   } catch (err) {
     console.warn("Pageviews API unavailable, using fallback puzzle:", err);
-    const [answer, clue] = FALLBACK_PUZZLES[rand() % FALLBACK_PUZZLES.length];
+    const [answer, clue] = FALLBACK_PUZZLES[xmur3("bordm-" + key)() % FALLBACK_PUZZLES.length];
     /* Deliberately not cached: next load retries the real source, and the
      * saved-game answer check below protects any game started on the fallback. */
     puzzle = { answer, clue, source: "Classic phrase", key, num, fallback: true };
