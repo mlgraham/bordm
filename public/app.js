@@ -7,8 +7,13 @@
 const VOWELS = "AEIOU";
 const MAX_CHECKS = 4;
 const EPOCH_UTC = Date.UTC(2026, 7, 1); // Aug 1 2026 = Bordm #1
-const FEED_URL = (y, m, d) =>
-  `https://en.wikipedia.org/api/rest_v1/feed/featured/${y}/${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}`;
+/* Finalized daily pageview rankings — immutable once published, unlike the
+ * featured-content feed, whose sections mutate during the day. We read the
+ * date two UTC days back so the data is guaranteed complete. */
+const TOP_URL = (y, m, d) =>
+  `https://wikimedia.org/api/rest_v1/metrics/pageviews/top/en.wikipedia/all-access/${y}/${String(m).padStart(2, "0")}/${String(d).padStart(2, "0")}`;
+const SUMMARY_URL = (title) =>
+  `https://en.wikipedia.org/api/rest_v1/page/summary/${encodeURIComponent(title)}`;
 
 /* Evergreen fallbacks if the feed is unreachable; picked deterministically by date. */
 const FALLBACK_PUZZLES = [
@@ -86,56 +91,81 @@ function cleanTitle(raw) {
   return { answer: words.join(" "), hint };
 }
 
-const TITLE_BLACKLIST = /^(deaths in|list of|main page|wikipedia|portal)/i;
+/* Wiki namespace pages and meta lists that should never be puzzles. */
+const TITLE_BLACKLIST =
+  /^(Main_Page$|Deaths_in|List_of|Special:|Wikipedia:|File:|Portal:|Help:|Template:|User:|Talk:|Category:|Draft:)|_talk:/i;
 
-function candidatesFromFeed(feed) {
+function candidatesFromTop(data) {
   const out = [];
-  const push = (title, desc, source) => {
-    if (!title || TITLE_BLACKLIST.test(title)) return;
-    const cleaned = cleanTitle(title);
-    if (!cleaned) return;
-    out.push({
-      answer: cleaned.answer,
-      clue: desc || cleaned.hint || "A name in the news",
-      source,
-    });
-  };
-  for (const a of (feed.mostread && feed.mostread.articles) || []) {
-    push(a.titles && a.titles.normalized, a.description, "Trending on Wikipedia yesterday");
-  }
-  if (feed.tfa) {
-    push(feed.tfa.titles && feed.tfa.titles.normalized, feed.tfa.description, "Today's featured article");
+  const articles = ((data.items && data.items[0] && data.items[0].articles) || []).slice(0, 60);
+  for (const a of articles) {
+    const raw = a.article;
+    if (!raw || TITLE_BLACKLIST.test(raw)) continue;
+    const cleaned = cleanTitle(raw.replace(/_/g, " "));
+    if (cleaned) out.push({ raw, answer: cleaned.answer, hint: cleaned.hint });
   }
   return out;
 }
 
 function redactClue(clue, answer) {
   let c = clue;
-  for (const w of answer.split(" ")) {
-    const bare = w.replace(/[^A-Z]/g, "");
-    if (bare.length > 3) c = c.replace(new RegExp(bare, "gi"), "…");
+  // Letter-runs, not space-separated words: "SPIDER-MAN" must redact both parts.
+  for (const w of answer.split(/[^A-Z]+/)) {
+    if (w.length > 3) c = c.replace(new RegExp(w, "gi"), "…");
   }
-  return c;
+  return c.replace(/…(\s*[-–]\s*…)+/g, "…").replace(/(…\s*)+…/g, "…");
+}
+
+function minusDays({ y, m, d }, n) {
+  const t = new Date(Date.UTC(y, m - 1, d) - n * 86400000);
+  return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() };
 }
 
 async function loadPuzzle() {
   const utc = todayUTC();
   const key = dateKey(utc);
   const num = puzzleNumber(utc);
-  const rand = xmur3("bordm-" + key);
+
+  /* Once a puzzle is derived for a date, it is pinned for this player —
+   * no API behavior can swap the board out from under a game in progress. */
   try {
-    const res = await fetch(FEED_URL(utc.y, utc.m, utc.d), { headers: { Accept: "application/json" } });
-    if (!res.ok) throw new Error("feed " + res.status);
-    const feed = await res.json();
-    const cands = candidatesFromFeed(feed);
+    const cached = JSON.parse(localStorage.getItem("bordm-puzzle"));
+    if (cached && cached.key === key && cached.answer) return cached;
+  } catch { /* ignore corrupt cache */ }
+
+  const rand = xmur3("bordm-" + key);
+  let puzzle;
+  try {
+    const src = minusDays(utc, 2);
+    const res = await fetch(TOP_URL(src.y, src.m, src.d), { headers: { Accept: "application/json" } });
+    if (!res.ok) throw new Error("pageviews " + res.status);
+    const cands = candidatesFromTop(await res.json());
     if (!cands.length) throw new Error("no candidates");
     const pick = cands[rand() % cands.length];
-    return { ...pick, clue: redactClue(pick.clue, pick.answer), key, num, fallback: false };
+    let clue = pick.hint || "In the news";
+    try {
+      const s = await fetch(SUMMARY_URL(pick.raw), { headers: { Accept: "application/json" } });
+      if (s.ok) {
+        const sum = await s.json();
+        if (sum.description) clue = sum.description;
+        else if (sum.extract) clue = sum.extract.split(". ")[0];
+      }
+    } catch { /* keep hint-based clue */ }
+    puzzle = {
+      answer: pick.answer,
+      clue: redactClue(clue, pick.answer),
+      source: "Read by millions on Wikipedia",
+      key, num, fallback: false,
+    };
+    try { localStorage.setItem("bordm-puzzle", JSON.stringify(puzzle)); } catch { /* private mode */ }
   } catch (err) {
-    console.warn("Feed unavailable, using fallback puzzle:", err);
+    console.warn("Pageviews API unavailable, using fallback puzzle:", err);
     const [answer, clue] = FALLBACK_PUZZLES[rand() % FALLBACK_PUZZLES.length];
-    return { answer, clue, source: "Classic phrase", key, num, fallback: true };
+    /* Deliberately not cached: next load retries the real source, and the
+     * saved-game answer check below protects any game started on the fallback. */
+    puzzle = { answer, clue, source: "Classic phrase", key, num, fallback: true };
   }
+  return puzzle;
 }
 
 /* ---------- game state ---------- */
@@ -158,6 +188,7 @@ function stateStorageKey() { return "bordm-game"; }
 function saveGame() {
   localStorage.setItem(stateStorageKey(), JSON.stringify({
     key: game.puzzle.key,
+    answer: game.puzzle.answer,
     inputs: game.slots.map((s) => s.input),
     locked: game.slots.map((s) => s.locked),
     checksUsed: game.checksUsed,
@@ -172,7 +203,9 @@ function loadSavedGame() {
     const raw = localStorage.getItem(stateStorageKey());
     if (!raw) return null;
     const s = JSON.parse(raw);
-    return s.key === game.puzzle.key ? s : null;
+    // Same date AND same board — a saved game from a different puzzle
+    // (e.g. one started on the fallback) must not restore onto this one.
+    return s.key === game.puzzle.key && s.answer === game.puzzle.answer ? s : null;
   } catch { return null; }
 }
 

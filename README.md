@@ -2,7 +2,7 @@
 
 **[bordm.com](https://www.bordm.com)** — a daily vowel-restoration puzzle. BORDM is BOREDOM with letters missing; each day the game does the same thing to a phrase, and you put the vowels back in 4 tries.
 
-The phrase comes from what the world read on Wikipedia yesterday, with the article's description as your clue. Results share Wordle-style:
+The phrase comes from what the world has been reading on Wikipedia, with the article's description as your clue. Results share Wordle-style:
 
 ```
 Bordm #2 3/4
@@ -15,8 +15,8 @@ bordm.com
 ## How it works
 
 - Static site, no build step, no server: `public/` is deployed as-is to Cloudflare Pages.
-- The daily puzzle is derived **client-side** from the [Wikimedia featured-content feed](https://en.wikipedia.org/api/rest_v1/) (CORS-open, keyless, refreshed every UTC day): candidate titles are filtered for puzzle-worthiness, then one is picked with a PRNG seeded by the UTC date — so every player gets the same puzzle and the site needs no daily updates, ever.
-- If the feed is unreachable, a bundled list of idioms (picked by the same date seed) keeps the game playable offline.
+- The daily puzzle is derived **client-side** from the [Wikimedia pageviews API](https://wikimedia.org/api/rest_v1/) (CORS-open, keyless, finalized daily): the top-read articles from two UTC days back are filtered for puzzle-worthiness, then one is picked with a PRNG seeded by the UTC date — so every player gets the same puzzle and the site needs no daily updates, ever. The clue is the article's description from the page-summary endpoint, and the derived puzzle is pinned in `localStorage` so a board never changes mid-game.
+- If the API is unreachable, a bundled list of idioms (picked by the same date seed) keeps the game playable offline.
 - Streaks and stats live in `localStorage`.
 
 ## Develop
