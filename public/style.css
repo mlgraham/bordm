@@ -156,7 +156,13 @@ main {
 }
 .key:active { filter: brightness(1.2); }
 .key.wide { flex: 1.6 1 0; }
-.key.check { background: var(--green); font-size: 14px; }
+.key.check {
+  background: var(--green);
+  font-size: 14px;
+  min-width: fit-content;
+  padding: 0 10px;
+  white-space: nowrap;
+}
 .key.check:disabled { background: #2f2f31; color: var(--muted); cursor: not-allowed; }
 
 .loading { color: var(--muted); margin-top: 30px; }
