@@ -484,8 +484,8 @@
     restart.textContent = "⟳";
     restart.title = "Restart";
     restart.style.cssText =
-      "width:44px;height:44px;margin-top:6px;background:transparent;color:#7a7a7a;" +
-      "border:1.5px solid #7a7a7a;border-radius:8px;font-size:18px;touch-action:none;";
+      "width:56px;height:56px;margin:0 6px;background:transparent;color:#f2f2f2;" +
+      "border:1.5px solid #7a7a7a;border-radius:8px;font-size:20px;touch-action:none;";
     restart.addEventListener("pointerdown", (ev) => { ev.preventDefault(); resetRound(); });
     midBox.appendChild(restart);
     const abortBtn = mk("X", "abort", rightBox);
