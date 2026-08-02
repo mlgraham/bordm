@@ -456,45 +456,60 @@
 
   function preventZoom(e) { e.preventDefault(); }
 
-  function makeTouchUi() {
+  function makeTouchUi(force) {
+    if (!force && !("ontouchstart" in window) && navigator.maxTouchPoints === 0) return;
     ui = document.createElement("div");
     ui.style.cssText =
-      "position:fixed;bottom:12px;left:0;right:0;display:flex;justify-content:space-between;" +
-      "padding:0 16px;z-index:1001;user-select:none;-webkit-user-select:none;";
-    const mk = (label, prop, side) => {
+      "position:fixed;bottom:0;left:0;right:0;z-index:1001;display:flex;flex-direction:column;" +
+      "align-items:stretch;gap:10px;padding:0 18px calc(14px + env(safe-area-inset-bottom));" +
+      "user-select:none;-webkit-user-select:none;pointer-events:none;";
+
+    const btn = (label, size, color) => {
       const b = document.createElement("button");
       b.textContent = label;
       b.style.cssText =
-        "width:56px;height:56px;margin:0 6px;background:transparent;color:#f2f2f2;" +
-        "border:1.5px solid #7a7a7a;border-radius:8px;font-size:20px;touch-action:none;";
+        `width:${size}px;height:${size}px;flex:none;background:rgba(18,18,19,0.55);` +
+        `color:${color};border:1.5px solid ${color === RED ? RED : "#7a7a7a"};` +
+        `border-radius:10px;font-size:${size > 50 ? 24 : 18}px;` +
+        "touch-action:none;pointer-events:auto;";
+      return b;
+    };
+    const hold = (b, prop) => {
       const set = (v) => (ev) => { touch[prop] = v; ev.preventDefault(); };
       b.addEventListener("pointerdown", set(true));
       b.addEventListener("pointerup", set(false));
       b.addEventListener("pointercancel", set(false));
       b.addEventListener("pointerleave", set(false));
-      side.appendChild(b);
-      return b;
     };
-    const leftBox = document.createElement("div");
-    const midBox = document.createElement("div");
-    const rightBox = document.createElement("div");
-    mk("◀", "left", leftBox);
-    mk("▶", "right", leftBox);
-    const restart = document.createElement("button");
-    restart.textContent = "⟳";
+    const row = (justify) => {
+      const r = document.createElement("div");
+      r.style.cssText = `display:flex;flex-wrap:nowrap;justify-content:${justify};gap:10px;`;
+      return r;
+    };
+
+    // small secondary actions, centered above the main controls
+    const top = row("center");
+    const restart = btn("⟳", 44, "#f2f2f2");
     restart.title = "Restart";
-    restart.style.cssText =
-      "width:56px;height:56px;margin:0 6px;background:transparent;color:#f2f2f2;" +
-      "border:1.5px solid #7a7a7a;border-radius:8px;font-size:20px;touch-action:none;";
     restart.addEventListener("pointerdown", (ev) => { ev.preventDefault(); resetRound(); });
-    midBox.appendChild(restart);
-    const abortBtn = mk("X", "abort", rightBox);
-    abortBtn.style.color = RED;
-    abortBtn.style.borderColor = RED;
+    const abortBtn = btn("X", 44, RED);
     abortBtn.title = "Abort: flight software rights the ship";
-    mk("▼", "down", rightBox);
-    mk("▲", "up", rightBox);
-    ui.append(leftBox, midBox, rightBox);
+    hold(abortBtn, "abort");
+    top.append(restart, abortBtn);
+
+    // big primary pairs in the corners for two-thumb play
+    const main = row("space-between");
+    const leftPair = row("flex-start");
+    const l = btn("◀", 64, "#f2f2f2"); hold(l, "left");
+    const r = btn("▶", 64, "#f2f2f2"); hold(r, "right");
+    leftPair.append(l, r);
+    const rightPair = row("flex-end");
+    const dn = btn("▼", 64, "#f2f2f2"); hold(dn, "down");
+    const up = btn("▲", 64, "#f2f2f2"); hold(up, "up");
+    rightPair.append(dn, up);
+    main.append(leftPair, rightPair);
+
+    ui.append(top, main);
     document.body.appendChild(ui);
   }
 
@@ -582,5 +597,5 @@
   sync();
 
   // debug/test handle
-  window.__lander = { game, boot, exit, resetRound, keys, touch };
+  window.__lander = { game, boot, exit, resetRound, keys, touch, makeTouchUi };
 })();
