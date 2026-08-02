@@ -320,8 +320,9 @@ function renderSlots() {
     s.el.classList.toggle("filled", !s.locked && !!s.input);
   }
   const allFilled = game.slots.every((s) => s.locked || s.input);
-  $("check-btn").disabled = game.finished || !allFilled;
-  $("checks-left").textContent = `(${MAX_CHECKS - game.checksUsed})`;
+  $("check-btn").disabled = game.finished ? false : !allFilled;
+  const checksLeft = $("checks-left");
+  if (checksLeft) checksLeft.textContent = `(${MAX_CHECKS - game.checksUsed})`;
 }
 
 function renderRows() {
@@ -331,7 +332,11 @@ function renderRows() {
 /* ---------- gameplay ---------- */
 
 function handleKey(key) {
-  if (game.finished || !game.puzzle) return;
+  if (!game.puzzle) return;
+  if (game.finished) {
+    if (key === "Enter") showModal();
+    return;
+  }
   if (key === "Backspace") {
     let i = game.activeSlot;
     if (i < 0) return;
@@ -416,6 +421,10 @@ function finish(won, restoring) {
   game.finished = true;
   game.won = won;
   setActiveSlot(-1);
+  // The check button becomes the way back to the results/share modal.
+  const btn = $("check-btn");
+  btn.textContent = "Results";
+  btn.disabled = false;
   if (!restoring) recordResult(won, game.checksUsed);
   showModal();
 }
