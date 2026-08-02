@@ -1,12 +1,13 @@
 "use strict";
 
 /* Bordm — daily vowel-restoration puzzle.
- * Puzzle source: Wikimedia featured-content feed (CORS-open, updates every UTC day).
- * The same UTC date always yields the same puzzle for every player. */
+ * Puzzle source: Wikimedia pageviews API (CORS-open, finalized daily).
+ * One global game day, flipping at midnight US-Pacific; the same game date
+ * always yields the same puzzle for every player everywhere. */
 
 const VOWELS = "AEIOU";
 const MAX_CHECKS = 4;
-const EPOCH_UTC = Date.UTC(2026, 7, 1); // Aug 1 2026 = Bordm #1
+const EPOCH_UTC = Date.UTC(2026, 7, 1); // game date 2026-08-01 = Bordm #1
 /* Finalized daily pageview rankings — immutable once published, unlike the
  * featured-content feed, whose sections mutate during the day. We read the
  * date two UTC days back so the data is guaranteed complete. */
@@ -60,9 +61,15 @@ function xmur3(str) {
 
 /* ---------- puzzle derivation ---------- */
 
-function todayUTC() {
-  const now = new Date();
-  return { y: now.getUTCFullYear(), m: now.getUTCMonth() + 1, d: now.getUTCDate() };
+/* The game day flips at midnight US-Pacific — a fixed wall clock everyone
+ * shares, not each player's local midnight. Browsers ship the IANA timezone
+ * database, so this is as deterministic as UTC math. */
+const GAME_TZ = "America/Los_Angeles";
+
+function todayGameDate() {
+  const [y, m, d] = new Intl.DateTimeFormat("en-CA", { timeZone: GAME_TZ })
+    .format(new Date()).split("-").map(Number);
+  return { y, m, d };
 }
 
 function dateKey({ y, m, d }) {
@@ -138,9 +145,9 @@ function pickFor(key, cands) {
 }
 
 async function loadPuzzle() {
-  const utc = todayUTC();
-  const key = dateKey(utc);
-  const num = puzzleNumber(utc);
+  const today = todayGameDate();
+  const key = dateKey(today);
+  const num = puzzleNumber(today);
 
   /* Once a puzzle is derived for a date, it is pinned for this player —
    * no API behavior can swap the board out from under a game in progress. */
@@ -151,15 +158,15 @@ async function loadPuzzle() {
 
   let puzzle;
   try {
-    let cands = await fetchCandidates(utc);
+    let cands = await fetchCandidates(today);
     if (!cands.length) throw new Error("no candidates");
     /* Variety: a blockbuster can top the charts for days, so exclude
      * candidates sharing a significant word with yesterday's pick.
      * Yesterday's pick is recomputed here with the same seeded algorithm
      * (one level deep, unfiltered), keeping today fully deterministic. */
     try {
-      const yKey = dateKey(minusDays(utc, 1));
-      const yCands = await fetchCandidates(minusDays(utc, 1));
+      const yKey = dateKey(minusDays(today, 1));
+      const yCands = await fetchCandidates(minusDays(today, 1));
       if (yCands.length) {
         const avoid = new Set(answerWords(pickFor(yKey, yCands).answer));
         const varied = cands.filter((c) => !answerWords(c.answer).some((w) => avoid.has(w)));
@@ -243,10 +250,7 @@ function recordResult(won, checks) {
   const s = loadStats();
   s.played = (s.played || 0) + 1;
   s.wins = (s.wins || 0) + (won ? 1 : 0);
-  const yesterday = dateKey((() => {
-    const t = new Date(Date.now() - 86400000);
-    return { y: t.getUTCFullYear(), m: t.getUTCMonth() + 1, d: t.getUTCDate() };
-  })());
+  const yesterday = dateKey(minusDays(todayGameDate(), 1));
   s.streak = won ? ((s.lastWinKey === yesterday ? s.streak : 0) || 0) + 1 : 0;
   if (won) s.lastWinKey = game.puzzle.key;
   s.dist = s.dist || {};
@@ -443,9 +447,10 @@ function showModal() {
 }
 
 function tickCountdown() {
-  const now = new Date();
-  const next = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate() + 1);
-  const ms = next - now.getTime();
+  const t = new Intl.DateTimeFormat("en-GB", {
+    timeZone: GAME_TZ, hour: "2-digit", minute: "2-digit", second: "2-digit", hour12: false,
+  }).format(new Date()).split(":").map(Number);
+  const ms = ((24 - t[0]) * 3600 - t[1] * 60 - t[2]) * 1000;
   const h = Math.floor(ms / 3600000), m = Math.floor((ms % 3600000) / 60000), sec = Math.floor((ms % 60000) / 1000);
   const el = $("countdown");
   if (el) el.textContent = `${h}h ${m}m ${sec}s`;
