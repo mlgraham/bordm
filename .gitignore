@@ -216,3 +216,11 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Playwright MCP session artifacts
+.playwright-mcp/
+.DS_Store
+
+# Local Claude Code config — not part of the published project
+.mcp.json
+CLAUDE.md

@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+  <title>Bordm — restore the vowels</title>
+  <meta name="description" content="Bordm: the daily vowel-restoration puzzle. Boredom, minus a few letters.">
+  <meta property="og:title" content="Bordm — restore the vowels">
+  <meta property="og:description" content="A new disemvoweled phrase every day. Put the vowels back in 4 tries.">
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><rect width='100' height='100' rx='12' fill='%23538d4e'/><text x='50' y='72' font-size='62' font-family='Helvetica,Arial,sans-serif' font-weight='bold' text-anchor='middle' fill='white'>B</text></svg>">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header>
+    <div class="logo" aria-label="Bordm">
+      <span class="lt c">B</span><span class="lt v">O</span><span class="lt c">R</span><span class="lt c">D</span><span class="lt c">M</span>
+    </div>
+    <p class="tagline">boredom, minus a few letters &mdash; put the vowels back</p>
+  </header>
+
+  <main>
+    <div id="meta" class="meta" hidden>
+      <span id="puzzle-num"></span>
+      <span id="clue-source" class="source"></span>
+    </div>
+    <p id="clue" class="clue" hidden></p>
+
+    <div id="board" class="board" aria-live="polite"></div>
+
+    <div id="rows" class="rows" aria-hidden="true"></div>
+
+    <div id="keyboard" class="keyboard">
+      <button class="key vowel" data-key="A">A</button>
+      <button class="key vowel" data-key="E">E</button>
+      <button class="key vowel" data-key="I">I</button>
+      <button class="key vowel" data-key="O">O</button>
+      <button class="key vowel" data-key="U">U</button>
+      <button class="key wide" data-key="Backspace">⌫</button>
+      <button class="key wide check" id="check-btn" data-key="Enter" disabled>Check <span id="checks-left"></span></button>
+    </div>
+
+    <p id="loading" class="loading">Fetching today&rsquo;s puzzle&hellip;</p>
+  </main>
+
+  <div id="modal" class="modal" hidden>
+    <div class="modal-card">
+      <button class="modal-close" id="modal-close" aria-label="Close">×</button>
+      <h2 id="result-title"></h2>
+      <p id="result-answer" class="answer"></p>
+      <p id="result-clue" class="answer-clue"></p>
+      <pre id="share-preview" class="share-preview"></pre>
+      <button id="share-btn" class="share-btn">Share</button>
+      <div class="stats" id="stats"></div>
+      <p class="countdown">Next puzzle in <span id="countdown"></span></p>
+    </div>
+  </div>
+
+  <footer>
+    <p>A daily puzzle drawn from what the world read on Wikipedia yesterday.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
