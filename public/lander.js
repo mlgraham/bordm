@@ -454,6 +454,8 @@
     }
   }
 
+  function preventZoom(e) { e.preventDefault(); }
+
   function makeTouchUi() {
     ui = document.createElement("div");
     ui.style.cssText =
@@ -474,33 +476,56 @@
       return b;
     };
     const leftBox = document.createElement("div");
+    const midBox = document.createElement("div");
     const rightBox = document.createElement("div");
     mk("◀", "left", leftBox);
     mk("▶", "right", leftBox);
+    const restart = document.createElement("button");
+    restart.textContent = "⟳";
+    restart.title = "Restart";
+    restart.style.cssText =
+      "width:44px;height:44px;margin-top:6px;background:transparent;color:#7a7a7a;" +
+      "border:1.5px solid #7a7a7a;border-radius:8px;font-size:18px;touch-action:none;";
+    restart.addEventListener("pointerdown", (ev) => { ev.preventDefault(); resetRound(); });
+    midBox.appendChild(restart);
     const abortBtn = mk("X", "abort", rightBox);
     abortBtn.style.color = RED;
     abortBtn.style.borderColor = RED;
     abortBtn.title = "Abort: flight software rights the ship";
     mk("▼", "down", rightBox);
     mk("▲", "up", rightBox);
-    ui.append(leftBox, rightBox);
+    ui.append(leftBox, midBox, rightBox);
     document.body.appendChild(ui);
   }
 
   function fit() {
     const dpr = window.devicePixelRatio || 1;
-    W = window.innerWidth;
-    H = window.innerHeight;
+    const vv = window.visualViewport;
+    W = Math.round(vv ? vv.width : window.innerWidth);
+    H = Math.round(vv ? vv.height : window.innerHeight);
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
+    canvas.style.width = W + "px";
+    canvas.style.height = H + "px";
     craft = Math.min(1, Math.max(0.5, W / 720));
   }
 
   function resize() {
     if (!canvas) return;
+    const oldW = W, oldH = H;
     fit();
-    resetRound();
-    game.attempt--; // resize shouldn't count as an attempt
+    if (W === oldW && H === oldH) return;
+    if (!game.terrain.length || Math.abs(W - oldW) > 120 || Math.abs(H - oldH) > 240) {
+      resetRound();
+      game.attempt--; // resize shouldn't count as an attempt
+      return;
+    }
+    // minor shift (mobile address bar, viewport settling): stretch in place
+    const fx = W / oldW;
+    for (const p of game.terrain) p[0] *= fx;
+    for (const p of game.pads) { p.x0 *= fx; p.x1 *= fx; }
+    for (const st of game.stars) st[0] *= fx;
+    game.x *= fx;
   }
 
   function boot() {
@@ -508,7 +533,7 @@
     active = true;
     canvas = document.createElement("canvas");
     canvas.id = "lunarlander";
-    canvas.style.cssText = "position:fixed;inset:0;z-index:1000;background:#121213;touch-action:none;width:100vw;height:100vh;";
+    canvas.style.cssText = "position:fixed;left:0;top:0;z-index:1000;background:#121213;touch-action:none;";
     document.body.appendChild(canvas);
     canvas.addEventListener("pointerdown", () => {
       if (game.state !== "flying") resetRound();
@@ -518,7 +543,12 @@
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onKey);
     window.addEventListener("resize", resize);
+    if (window.visualViewport) window.visualViewport.addEventListener("resize", resize);
+    window.addEventListener("orientationchange", resize);
+    document.addEventListener("gesturestart", preventZoom, { passive: false });
+    canvas.addEventListener("touchmove", preventZoom, { passive: false });
     fit();
+    setTimeout(resize, 400); // mobile viewport settles after load/refresh
     game.score = 0;
     game.attempt = 0;
     resetRound();
@@ -532,6 +562,9 @@
     window.removeEventListener("keydown", onKey);
     window.removeEventListener("keyup", onKey);
     window.removeEventListener("resize", resize);
+    if (window.visualViewport) window.visualViewport.removeEventListener("resize", resize);
+    window.removeEventListener("orientationchange", resize);
+    document.removeEventListener("gesturestart", preventZoom);
     if (canvas) canvas.remove();
     if (ui) ui.remove();
     canvas = ctx = ui = null;
