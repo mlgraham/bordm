@@ -112,9 +112,11 @@ function candidatesFromTop(data) {
 
 function redactClue(clue, answer) {
   let c = clue;
-  // Letter-runs, not space-separated words: "SPIDER-MAN" must redact both parts.
+  // Letter-runs, not space-separated words: "SPIDER-MAN" must redact both
+  // parts — a surviving "-Man" would hand the player that slot's vowel.
+  // Word boundaries keep short runs like IN from matching inside "Indian".
   for (const w of answer.split(/[^A-Z]+/)) {
-    if (w.length > 3) c = c.replace(new RegExp(w, "gi"), "…");
+    if (w.length >= 2) c = c.replace(new RegExp("\\b" + w + "\\b", "gi"), "…");
   }
   return c.replace(/…(\s*[-–]\s*…)+/g, "…").replace(/(…\s*)+…/g, "…");
 }
