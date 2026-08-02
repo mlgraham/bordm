@@ -241,4 +241,11 @@ footer {
   font-size: 11px;
 }
 
+footer .gh {
+  color: var(--muted);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+footer .gh:hover { color: var(--text); }
+
 [hidden] { display: none !important; }
