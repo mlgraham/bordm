@@ -526,7 +526,11 @@
     const up = btn("▲", 64, "#f2f2f2"); hold(up, "up");
     rightPair.append(dn, up);
     // trackpoint nub: one thumb for both vectoring (x) and thrust (y, up)
-    const nubR = 32, dotR = 11, nubRange = 36;
+    // fill the gap between the arrow pairs, keeping the same 10px margin the
+    // buttons use between themselves; a bigger pad means finer control.
+    // 9px row inset + 138px pair + 10px margin on each side leaves W - 314.
+    const nubD = Math.max(64, Math.min(120, W - 314));
+    const nubR = nubD / 2, dotR = Math.round(nubR * 0.34), nubRange = nubR + 4;
     const nubPad = document.createElement("div");
     nubPad.style.cssText =
       `position:relative;width:${nubR * 2}px;height:${nubR * 2}px;flex:none;` +
