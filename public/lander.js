@@ -543,7 +543,7 @@
     const dot = document.createElement("div");
     dot.style.cssText =
       `position:absolute;width:${dotR * 2}px;height:${dotR * 2}px;border-radius:50%;` +
-      "background:rgba(255,64,64,0.55);border:1.5px solid rgba(255,64,64,0.9);" +
+      "background:rgba(160,160,160,0.45);border:1.5px solid rgba(200,200,200,0.8);" +
       "left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;";
     nubPad.appendChild(dot);
     const nubValue = (ev) => {
