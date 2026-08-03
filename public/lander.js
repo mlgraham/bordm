@@ -548,6 +548,7 @@
     };
     drag(nubPad, nubValue, () => {
       touch.nub = null;
+      game.throttle = 0; // momentary: releasing the nub cuts the engine
       dot.style.left = "50%";
       dot.style.top = "50%";
     });
