@@ -604,6 +604,7 @@
       if (game.state !== "flying") resetRound();
     });
     ctx = canvas.getContext("2d");
+    fit(); // measure the viewport before sizing the touch UI
     makeTouchUi();
     window.addEventListener("keydown", onKey);
     window.addEventListener("keyup", onKey);
@@ -612,7 +613,6 @@
     window.addEventListener("orientationchange", resize);
     document.addEventListener("gesturestart", preventZoom, { passive: false });
     canvas.addEventListener("touchmove", preventZoom, { passive: false });
-    fit();
     setTimeout(resize, 400); // mobile viewport settles after load/refresh
     game.score = 0;
     game.attempt = 0;
