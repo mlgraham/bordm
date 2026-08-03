@@ -47,8 +47,6 @@
 
   let canvas, ctx, ui, raf = 0, last = 0, active = false;
   let W = 0, H = 0;
-  let playH = 0; // world height: on touch devices the bottom strip is
-                 // reserved for the controls, like an arcade cabinet bezel
 
   const keys = {};
   const touch = { up: false, down: false, left: false, right: false, abort: false, nub: null };
@@ -73,8 +71,8 @@
   function generateTerrain() {
     const n = 128;
     const pts = new Array(n + 1).fill(0);
-    const avg = playH * 0.8;
-    let disp = playH * 0.18;
+    const avg = H * 0.8;
+    let disp = H * 0.18;
     pts[0] = avg + (Math.random() * 2 - 1) * disp;
     pts[n] = avg + (Math.random() * 2 - 1) * disp;
     for (let step = n; step > 1; step = Math.floor(step / 2)) {
@@ -84,7 +82,7 @@
       }
       disp *= 0.58;
     }
-    const minY = playH * 0.55, maxY = playH * 0.94;
+    const minY = H * 0.55, maxY = H * 0.94;
     for (let i = 0; i <= n; i++) pts[i] = Math.min(maxY, Math.max(minY, pts[i]));
 
     game.terrain = pts.map((y, i) => [(i / n) * W, y]);
@@ -105,7 +103,7 @@
     });
 
     game.stars = Array.from({ length: 90 }, () => [
-      Math.random() * W, Math.random() * playH * 0.7, Math.random() < 0.2 ? 1.6 : 0.9,
+      Math.random() * W, Math.random() * H * 0.7, Math.random() < 0.2 ? 1.6 : 0.9,
     ]);
   }
 
@@ -126,7 +124,7 @@
     generateTerrain();
     game.state = "flying";
     game.x = W * 0.15;
-    game.y = playH * 0.14;
+    game.y = H * 0.14;
     game.vx = 40;
     game.vy = 0;
     game.angle = (Math.random() * 2 - 1) * 0.1;
@@ -306,11 +304,16 @@
 
     // camera: zoom on the lander when near the ground
     const z = game.zoom;
+    /* At cruise altitude (z=1) the world fills the screen — thumbs only
+     * cover scenery. As the low-altitude zoom engages on touch devices,
+     * lift the camera target so the lander and pad render above the
+     * control strip instead of underneath the thumbs. */
+    const reserve = IS_TOUCH ? 240 : 0;
+    const ty = (H - reserve * Math.max(0, Math.min(1, (z - 1) / 0.6))) / 2;
     let cx = game.x, cy = game.y + 60;
     cx = Math.max(W / (2 * z), Math.min(W - W / (2 * z), cx));
-    const cyMax = Math.max(H / (2 * z), playH - H / (2 * z));
-    cy = Math.max(H / (2 * z), Math.min(cyMax, cy));
-    ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (W / 2 - cx * z), dpr * (H / 2 - cy * z));
+    cy = Math.max(ty / z, Math.min(H - (H - ty) / z, cy));
+    ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (W / 2 - cx * z), dpr * (ty - cy * z));
 
     // stars
     ctx.fillStyle = DIM;
@@ -578,7 +581,6 @@
     canvas.style.width = W + "px";
     canvas.style.height = H + "px";
     craft = Math.min(1, Math.max(0.5, W / 720));
-    playH = IS_TOUCH ? Math.max(H * 0.55, H - 210) : H;
   }
 
   function resize() {
