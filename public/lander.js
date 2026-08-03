@@ -47,7 +47,8 @@
   let W = 0, H = 0;
 
   const keys = {};
-  const touch = { up: false, down: false, left: false, right: false, abort: false };
+  const touch = { up: false, down: false, left: false, right: false, abort: false, stickGimbal: null };
+  let sticks = null; // slider thumb elements, synced to game state each frame
 
   const game = {
     state: "flying", // flying | landed | crashed
@@ -157,6 +158,7 @@
     let gimbalTarget = 0;
     if (left) gimbalTarget = GIMBAL_MAX;    // +gimbal -> CCW torque -> nose left
     if (right) gimbalTarget = -GIMBAL_MAX;  // -gimbal -> CW torque  -> nose right
+    if (touch.stickGimbal != null) gimbalTarget = -touch.stickGimbal * GIMBAL_MAX;
 
     if (abort && game.fuel > 0) {
       // Flight software: full throttle, gimbal commanded to null angle+spin.
@@ -417,6 +419,13 @@
     const g = game.gimbal / GIMBAL_MAX; // -1..1
     ctx.fillRect(92 + Math.min(0, g * 40), 37, Math.abs(g) * 40, 12);
 
+    if (sticks) {
+      sticks.gThumb.style.left =
+        (sticks.GW / 2 - (game.gimbal / GIMBAL_MAX) * (sticks.GW / 2 - sticks.PAD)) + "px";
+      sticks.tThumb.style.top =
+        (sticks.PAD + (1 - game.throttle) * (sticks.TH - 2 * sticks.PAD)) + "px";
+    }
+
     if (game.state !== "flying") {
       ctx.textAlign = "center";
       ctx.fillStyle = game.state === "landed" ? WHITE : RED;
@@ -509,7 +518,54 @@
     rightPair.append(dn, up);
     main.append(leftPair, rightPair);
 
-    ui.append(top, main);
+    // analog sliders (experimental): gimbal stick left, throttle lever right
+    const GW = 150, GH = 44, TW = 44, TH = 140, PAD = 22;
+    const mkTrack = (w, h) => {
+      const t = document.createElement("div");
+      t.style.cssText =
+        `position:relative;width:${w}px;height:${h}px;flex:none;` +
+        "border:1.5px solid rgba(122,122,122,0.5);border-radius:22px;" +
+        "background:rgba(18,18,19,0.35);touch-action:none;pointer-events:auto;";
+      const thumb = document.createElement("div");
+      thumb.style.cssText =
+        "position:absolute;width:32px;height:32px;border-radius:50%;" +
+        "background:rgba(242,242,242,0.30);border:1.5px solid rgba(242,242,242,0.7);" +
+        "transform:translate(-50%,-50%);left:50%;top:50%;pointer-events:none;";
+      t.appendChild(thumb);
+      return [t, thumb];
+    };
+    const drag = (track, onValue, onRelease) => {
+      let held = false;
+      track.addEventListener("pointerdown", (ev) => {
+        held = true;
+        track.setPointerCapture(ev.pointerId);
+        onValue(ev);
+        ev.preventDefault();
+      });
+      track.addEventListener("pointermove", (ev) => { if (held) onValue(ev); });
+      const end = () => { held = false; if (onRelease) onRelease(); };
+      track.addEventListener("pointerup", end);
+      track.addEventListener("pointercancel", end);
+    };
+
+    const sliderRow = row("space-between");
+    sliderRow.style.alignItems = "flex-end";
+    const [gTrack, gThumb] = mkTrack(GW, GH);
+    drag(gTrack, (ev) => {
+      const r = gTrack.getBoundingClientRect();
+      touch.stickGimbal = Math.max(-1, Math.min(1,
+        (ev.clientX - r.left - r.width / 2) / (r.width / 2 - PAD)));
+    }, () => { touch.stickGimbal = null; }); // spring back to center
+    const [tTrack, tThumb] = mkTrack(TW, TH);
+    drag(tTrack, (ev) => {
+      const r = tTrack.getBoundingClientRect();
+      game.throttle = Math.max(0, Math.min(1,
+        1 - (ev.clientY - r.top - PAD) / (r.height - 2 * PAD)));
+    }); // sticky, like a real throttle lever
+    sliderRow.append(gTrack, tTrack);
+    sticks = { gThumb, tThumb, GW, TH, PAD };
+
+    ui.append(sliderRow, top, main);
     document.body.appendChild(ui);
   }
 
@@ -582,6 +638,8 @@
     document.removeEventListener("gesturestart", preventZoom);
     if (canvas) canvas.remove();
     if (ui) ui.remove();
+    sticks = null;
+    touch.stickGimbal = null;
     canvas = ctx = ui = null;
     if (location.hash === HASH) {
       history.replaceState(null, "", location.pathname + location.search);
