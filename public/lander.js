@@ -158,7 +158,7 @@
     let gimbalTarget = 0;
     if (left) gimbalTarget = GIMBAL_MAX;    // +gimbal -> CCW torque -> nose left
     if (right) gimbalTarget = -GIMBAL_MAX;  // -gimbal -> CW torque  -> nose right
-    if (touch.stickGimbal != null) gimbalTarget = touch.stickGimbal * GIMBAL_MAX; // inverted stick
+    if (touch.stickGimbal != null) gimbalTarget = -touch.stickGimbal * GIMBAL_MAX; // stick right = nose right
 
     if (abort && game.fuel > 0) {
       // Flight software: full throttle, gimbal commanded to null angle+spin.
@@ -421,7 +421,7 @@
 
     if (sticks) {
       sticks.gThumb.style.left =
-        (sticks.GW / 2 + (game.gimbal / GIMBAL_MAX) * (sticks.GW / 2 - sticks.PAD)) + "px";
+        (sticks.GW / 2 - (game.gimbal / GIMBAL_MAX) * (sticks.GW / 2 - sticks.PAD)) + "px";
       sticks.tThumb.style.top =
         (sticks.PAD + (1 - game.throttle) * (sticks.TH - 2 * sticks.PAD)) + "px";
     }
@@ -568,7 +568,7 @@
     sliderRow.append(gTrack, tBox);
     sticks = { gThumb, tThumb, GW, TH, PAD };
 
-    ui.append(sliderRow, top, main);
+    ui.append(top, sliderRow, main);
     document.body.appendChild(ui);
   }
 
