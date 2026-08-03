@@ -158,7 +158,7 @@
     let gimbalTarget = 0;
     if (left) gimbalTarget = GIMBAL_MAX;    // +gimbal -> CCW torque -> nose left
     if (right) gimbalTarget = -GIMBAL_MAX;  // -gimbal -> CW torque  -> nose right
-    if (touch.stickGimbal != null) gimbalTarget = -touch.stickGimbal * GIMBAL_MAX;
+    if (touch.stickGimbal != null) gimbalTarget = touch.stickGimbal * GIMBAL_MAX; // inverted stick
 
     if (abort && game.fuel > 0) {
       // Flight software: full throttle, gimbal commanded to null angle+spin.
@@ -421,9 +421,9 @@
 
     if (sticks) {
       sticks.gThumb.style.left =
-        (sticks.GW / 2 - (game.gimbal / GIMBAL_MAX) * (sticks.GW / 2 - sticks.PAD)) + "px";
+        (sticks.GW / 2 + (game.gimbal / GIMBAL_MAX) * (sticks.GW / 2 - sticks.PAD)) + "px";
       sticks.tThumb.style.top =
-        (sticks.PAD + (1 - game.throttle) * (sticks.TH - 2 * sticks.PAD)) + "px";
+        (sticks.PAD + game.throttle * (sticks.TH - 2 * sticks.PAD)) + "px";
     }
 
     if (game.state !== "flying") {
@@ -519,16 +519,16 @@
     main.append(leftPair, rightPair);
 
     // analog sliders (experimental): gimbal stick left, throttle lever right
-    const GW = 150, GH = 44, TW = 44, TH = 140, PAD = 22;
+    const GW = 120, GH = 40, TW = 40, TH = 120, PAD = 20;
     const mkTrack = (w, h) => {
       const t = document.createElement("div");
       t.style.cssText =
         `position:relative;width:${w}px;height:${h}px;flex:none;` +
-        "border:1.5px solid rgba(122,122,122,0.5);border-radius:22px;" +
+        "border:1.5px solid rgba(122,122,122,0.5);border-radius:20px;" +
         "background:rgba(18,18,19,0.35);touch-action:none;pointer-events:auto;";
       const thumb = document.createElement("div");
       thumb.style.cssText =
-        "position:absolute;width:32px;height:32px;border-radius:50%;" +
+        "position:absolute;width:28px;height:28px;border-radius:50%;" +
         "background:rgba(242,242,242,0.30);border:1.5px solid rgba(242,242,242,0.7);" +
         "transform:translate(-50%,-50%);left:50%;top:50%;pointer-events:none;";
       t.appendChild(thumb);
@@ -560,7 +560,7 @@
     drag(tTrack, (ev) => {
       const r = tTrack.getBoundingClientRect();
       game.throttle = Math.max(0, Math.min(1,
-        1 - (ev.clientY - r.top - PAD) / (r.height - 2 * PAD)));
+        (ev.clientY - r.top - PAD) / (r.height - 2 * PAD))); // inverted: down = thrust
     }); // sticky, like a real throttle lever
     sliderRow.append(gTrack, tTrack);
     sticks = { gThumb, tThumb, GW, TH, PAD };
