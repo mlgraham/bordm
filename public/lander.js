@@ -47,8 +47,7 @@
   let W = 0, H = 0;
 
   const keys = {};
-  const touch = { up: false, down: false, left: false, right: false, abort: false, stickGimbal: null, nub: null };
-  let sticks = null; // slider thumb elements, synced to game state each frame
+  const touch = { up: false, down: false, left: false, right: false, abort: false, nub: null };
 
   const game = {
     state: "flying", // flying | landed | crashed
@@ -158,7 +157,6 @@
     let gimbalTarget = 0;
     if (left) gimbalTarget = GIMBAL_MAX;    // +gimbal -> CCW torque -> nose left
     if (right) gimbalTarget = -GIMBAL_MAX;  // -gimbal -> CW torque  -> nose right
-    if (touch.stickGimbal != null) gimbalTarget = -touch.stickGimbal * GIMBAL_MAX; // stick right = nose right
     if (touch.nub) {
       gimbalTarget = -touch.nub.x * GIMBAL_MAX;
       game.throttle = Math.max(0, Math.min(1, -touch.nub.y)); // push up = thrust
@@ -423,13 +421,6 @@
     const g = game.gimbal / GIMBAL_MAX; // -1..1
     ctx.fillRect(92 + Math.min(0, g * 40), 37, Math.abs(g) * 40, 12);
 
-    if (sticks) {
-      sticks.gThumb.style.left =
-        (sticks.GW / 2 - (game.gimbal / GIMBAL_MAX) * (sticks.GW / 2 - sticks.PAD)) + "px";
-      sticks.tThumb.style.top =
-        (sticks.PAD + (1 - game.throttle) * (sticks.TH - 2 * sticks.PAD)) + "px";
-    }
-
     if (game.state !== "flying") {
       ctx.textAlign = "center";
       ctx.fillStyle = game.state === "landed" ? WHITE : RED;
@@ -525,6 +516,7 @@
 
     // big primary pairs in the corners for two-thumb play
     const main = row("space-between");
+    main.style.margin = "0 -9px"; // pair centers land 78px from the edges, where the sliders sat
     const leftPair = row("flex-start");
     const l = btn("◀", 64, "#f2f2f2"); hold(l, "left");
     const r = btn("▶", 64, "#f2f2f2"); hold(r, "right");
@@ -561,44 +553,8 @@
     });
     main.append(leftPair, nubPad, rightPair);
 
-    // analog sliders (experimental): gimbal stick left, throttle lever right
-    const GW = 120, GH = 40, TW = 40, TH = 120, PAD = 20;
-    const mkTrack = (w, h) => {
-      const t = document.createElement("div");
-      t.style.cssText =
-        `position:relative;width:${w}px;height:${h}px;flex:none;` +
-        "border:1.5px solid rgba(122,122,122,0.5);border-radius:20px;" +
-        "background:rgba(18,18,19,0.35);touch-action:none;pointer-events:auto;";
-      const thumb = document.createElement("div");
-      thumb.style.cssText =
-        "position:absolute;width:28px;height:28px;border-radius:50%;" +
-        "background:rgba(242,242,242,0.30);border:1.5px solid rgba(242,242,242,0.7);" +
-        "transform:translate(-50%,-50%);left:50%;top:50%;pointer-events:none;";
-      t.appendChild(thumb);
-      return [t, thumb];
-    };
 
-    const sliderRow = row("space-between");
-    sliderRow.style.alignItems = "center";
-    const [gTrack, gThumb] = mkTrack(GW, GH);
-    drag(gTrack, (ev) => {
-      const r = gTrack.getBoundingClientRect();
-      touch.stickGimbal = Math.max(-1, Math.min(1,
-        (ev.clientX - r.left - r.width / 2) / (r.width / 2 - PAD)));
-    }, () => { touch.stickGimbal = null; }); // spring back to center
-    const [tTrack, tThumb] = mkTrack(TW, TH);
-    drag(tTrack, (ev) => {
-      const r = tTrack.getBoundingClientRect();
-      game.throttle = Math.max(0, Math.min(1,
-        1 - (ev.clientY - r.top - PAD) / (r.height - 2 * PAD))); // up = thrust
-    }); // sticky, like a real throttle lever
-    const tBox = document.createElement("div");
-    tBox.style.cssText = `width:${GW}px;flex:none;display:flex;justify-content:center;`;
-    tBox.appendChild(tTrack);
-    sliderRow.append(gTrack, tBox);
-    sticks = { gThumb, tThumb, GW, TH, PAD };
-
-    ui.append(top, sliderRow, main);
+    ui.append(top, main);
     document.body.appendChild(ui);
   }
 
@@ -671,8 +627,6 @@
     document.removeEventListener("gesturestart", preventZoom);
     if (canvas) canvas.remove();
     if (ui) ui.remove();
-    sticks = null;
-    touch.stickGimbal = null;
     touch.nub = null;
     canvas = ctx = ui = null;
     if (location.hash === HASH) {
