@@ -516,27 +516,22 @@
 
     // big primary pairs in the corners for two-thumb play
     const main = row("space-between");
-    main.style.margin = "0 -9px"; // left pair center lands 78px from the edge
-    main.style.alignItems = "center";
-    main.style.position = "relative";
+    main.style.margin = "0 -9px"; // pair centers land 78px from the edges, where the sliders sat
     const leftPair = row("flex-start");
     const l = btn("◀", 64, "#f2f2f2"); hold(l, "left");
     const r = btn("▶", 64, "#f2f2f2"); hold(r, "right");
     leftPair.append(l, r);
     const rightPair = row("flex-end");
-    rightPair.style.flexDirection = "column";
-    rightPair.style.marginRight = "37px"; // stack center 78px from the right edge
-    const up = btn("▲", 64, "#f2f2f2"); hold(up, "up");
     const dn = btn("▼", 64, "#f2f2f2"); hold(dn, "down");
-    rightPair.append(up, dn);
+    const up = btn("▲", 64, "#f2f2f2"); hold(up, "up");
+    rightPair.append(dn, up);
     // trackpoint nub: one thumb for both vectoring (x) and thrust (y, up)
     const nubR = 32, dotR = 11, nubRange = 36;
     const nubPad = document.createElement("div");
     nubPad.style.cssText =
-      `position:absolute;left:50%;top:50%;transform:translate(-50%,-50%);` +
-      `width:${nubR * 2}px;height:${nubR * 2}px;` +
+      `position:relative;width:${nubR * 2}px;height:${nubR * 2}px;flex:none;` +
       "border:1.5px solid rgba(122,122,122,0.5);border-radius:50%;" +
-      "border-radius:50%;background:rgba(18,18,19,0.35);touch-action:none;pointer-events:auto;";
+      "background:rgba(18,18,19,0.35);touch-action:none;pointer-events:auto;align-self:center;";
     const dot = document.createElement("div");
     dot.style.cssText =
       `position:absolute;width:${dotR * 2}px;height:${dotR * 2}px;border-radius:50%;` +
@@ -560,7 +555,7 @@
     main.append(leftPair, nubPad, rightPair);
 
 
-    ui.append(main, top);
+    ui.append(top, main);
     document.body.appendChild(ui);
   }
 
