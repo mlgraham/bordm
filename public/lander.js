@@ -497,7 +497,7 @@
     };
 
     // small secondary actions, centered above the main controls
-    const top = row("center");
+    const top = row("space-between");
     const restart = btn("⟳", 44, "#f2f2f2");
     restart.title = "Restart";
     restart.addEventListener("pointerdown", (ev) => { ev.preventDefault(); resetRound(); });
