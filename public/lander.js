@@ -423,7 +423,7 @@
       sticks.gThumb.style.left =
         (sticks.GW / 2 + (game.gimbal / GIMBAL_MAX) * (sticks.GW / 2 - sticks.PAD)) + "px";
       sticks.tThumb.style.top =
-        (sticks.PAD + game.throttle * (sticks.TH - 2 * sticks.PAD)) + "px";
+        (sticks.PAD + (1 - game.throttle) * (sticks.TH - 2 * sticks.PAD)) + "px";
     }
 
     if (game.state !== "flying") {
@@ -549,7 +549,7 @@
     };
 
     const sliderRow = row("space-between");
-    sliderRow.style.alignItems = "flex-end";
+    sliderRow.style.alignItems = "center";
     const [gTrack, gThumb] = mkTrack(GW, GH);
     drag(gTrack, (ev) => {
       const r = gTrack.getBoundingClientRect();
@@ -560,9 +560,12 @@
     drag(tTrack, (ev) => {
       const r = tTrack.getBoundingClientRect();
       game.throttle = Math.max(0, Math.min(1,
-        (ev.clientY - r.top - PAD) / (r.height - 2 * PAD))); // inverted: down = thrust
+        1 - (ev.clientY - r.top - PAD) / (r.height - 2 * PAD))); // up = thrust
     }); // sticky, like a real throttle lever
-    sliderRow.append(gTrack, tTrack);
+    const tBox = document.createElement("div");
+    tBox.style.cssText = `width:${GW}px;flex:none;display:flex;justify-content:center;`;
+    tBox.appendChild(tTrack);
+    sliderRow.append(gTrack, tBox);
     sticks = { gThumb, tThumb, GW, TH, PAD };
 
     ui.append(sliderRow, top, main);
