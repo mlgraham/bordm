@@ -47,7 +47,7 @@
   let W = 0, H = 0;
 
   const keys = {};
-  const touch = { up: false, down: false, left: false, right: false, abort: false, stickGimbal: null };
+  const touch = { up: false, down: false, left: false, right: false, abort: false, stickGimbal: null, nub: null };
   let sticks = null; // slider thumb elements, synced to game state each frame
 
   const game = {
@@ -159,6 +159,10 @@
     if (left) gimbalTarget = GIMBAL_MAX;    // +gimbal -> CCW torque -> nose left
     if (right) gimbalTarget = -GIMBAL_MAX;  // -gimbal -> CW torque  -> nose right
     if (touch.stickGimbal != null) gimbalTarget = -touch.stickGimbal * GIMBAL_MAX; // stick right = nose right
+    if (touch.nub) {
+      gimbalTarget = -touch.nub.x * GIMBAL_MAX;
+      game.throttle = Math.max(0, Math.min(1, -touch.nub.y)); // push up = thrust
+    }
 
     if (abort && game.fuel > 0) {
       // Flight software: full throttle, gimbal commanded to null angle+spin.
@@ -495,6 +499,19 @@
       r.style.cssText = `display:flex;flex-wrap:nowrap;justify-content:${justify};gap:10px;`;
       return r;
     };
+    const drag = (track, onValue, onRelease) => {
+      let held = false;
+      track.addEventListener("pointerdown", (ev) => {
+        held = true;
+        track.setPointerCapture(ev.pointerId);
+        onValue(ev);
+        ev.preventDefault();
+      });
+      track.addEventListener("pointermove", (ev) => { if (held) onValue(ev); });
+      const end = () => { held = false; if (onRelease) onRelease(); };
+      track.addEventListener("pointerup", end);
+      track.addEventListener("pointercancel", end);
+    };
 
     // small secondary actions, centered above the main controls
     const top = row("space-between");
@@ -516,7 +533,33 @@
     const dn = btn("▼", 64, "#f2f2f2"); hold(dn, "down");
     const up = btn("▲", 64, "#f2f2f2"); hold(up, "up");
     rightPair.append(dn, up);
-    main.append(leftPair, rightPair);
+    // trackpoint nub: one thumb for both vectoring (x) and thrust (y, up)
+    const nubR = 32, dotR = 11, nubRange = 36;
+    const nubPad = document.createElement("div");
+    nubPad.style.cssText =
+      `position:relative;width:${nubR * 2}px;height:${nubR * 2}px;flex:none;` +
+      "border:1.5px solid rgba(122,122,122,0.5);border-radius:50%;" +
+      "background:rgba(18,18,19,0.35);touch-action:none;pointer-events:auto;align-self:center;";
+    const dot = document.createElement("div");
+    dot.style.cssText =
+      `position:absolute;width:${dotR * 2}px;height:${dotR * 2}px;border-radius:50%;` +
+      "background:rgba(255,64,64,0.55);border:1.5px solid rgba(255,64,64,0.9);" +
+      "left:50%;top:50%;transform:translate(-50%,-50%);pointer-events:none;";
+    nubPad.appendChild(dot);
+    const nubValue = (ev) => {
+      const r = nubPad.getBoundingClientRect();
+      const x = Math.max(-1, Math.min(1, (ev.clientX - r.left - r.width / 2) / nubRange));
+      const y = Math.max(-1, Math.min(1, (ev.clientY - r.top - r.height / 2) / nubRange));
+      touch.nub = { x, y };
+      dot.style.left = 50 + x * 32 + "%";
+      dot.style.top = 50 + y * 32 + "%";
+    };
+    drag(nubPad, nubValue, () => {
+      touch.nub = null;
+      dot.style.left = "50%";
+      dot.style.top = "50%";
+    });
+    main.append(leftPair, nubPad, rightPair);
 
     // analog sliders (experimental): gimbal stick left, throttle lever right
     const GW = 120, GH = 40, TW = 40, TH = 120, PAD = 20;
@@ -533,19 +576,6 @@
         "transform:translate(-50%,-50%);left:50%;top:50%;pointer-events:none;";
       t.appendChild(thumb);
       return [t, thumb];
-    };
-    const drag = (track, onValue, onRelease) => {
-      let held = false;
-      track.addEventListener("pointerdown", (ev) => {
-        held = true;
-        track.setPointerCapture(ev.pointerId);
-        onValue(ev);
-        ev.preventDefault();
-      });
-      track.addEventListener("pointermove", (ev) => { if (held) onValue(ev); });
-      const end = () => { held = false; if (onRelease) onRelease(); };
-      track.addEventListener("pointerup", end);
-      track.addEventListener("pointercancel", end);
     };
 
     const sliderRow = row("space-between");
@@ -643,6 +673,7 @@
     if (ui) ui.remove();
     sticks = null;
     touch.stickGimbal = null;
+    touch.nub = null;
     canvas = ctx = ui = null;
     if (location.hash === HASH) {
       history.replaceState(null, "", location.pathname + location.search);
