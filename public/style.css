@@ -22,6 +22,7 @@ body {
   flex-direction: column;
   align-items: center;
   min-height: 100dvh;
+  touch-action: manipulation; /* no double-tap zoom; residual page zoom breaks the lander overlay */
 }
 
 header {

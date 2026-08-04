@@ -11,6 +11,12 @@
 (function () {
   const HASH = "#lunarlander";
 
+  /* iOS keeps pinch-zoom across refreshes (but not fresh navigations), and a
+   * zoomed page shrinks the visual viewport and breaks fixed-position layout.
+   * Block the gestures site-wide so the zoom is never acquired. */
+  document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
+  document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive: false });
+
   /* ---------- physics constants (px, s, rad) ---------- */
   const G = 50;                 // gravity, px/s^2  (~1.62 m/s^2 at 31 px/m)
   const THRUST = 150;           // max thrust accel at dry mass, px/s^2
@@ -589,9 +595,12 @@
 
   function fit() {
     const dpr = window.devicePixelRatio || 1;
-    const vv = window.visualViewport;
-    W = Math.round(vv ? vv.width : window.innerWidth);
-    H = Math.round(vv ? vv.height : window.innerHeight);
+    // Layout viewport, not visualViewport: under residual pinch-zoom the
+    // visual viewport shrinks, which used to build a tiny canvas that
+    // exposed the word game behind it.
+    const de = document.documentElement;
+    W = Math.round(de.clientWidth || window.innerWidth);
+    H = Math.round(de.clientHeight || window.innerHeight);
     canvas.width = Math.round(W * dpr);
     canvas.height = Math.round(H * dpr);
     canvas.style.width = W + "px";
