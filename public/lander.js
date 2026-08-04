@@ -16,6 +16,22 @@
    * Block the gestures site-wide so the zoom is never acquired. */
   document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
   document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive: false });
+  document.addEventListener("dblclick", (e) => e.preventDefault(), { passive: false });
+
+  /* Self-healing: if zoom sneaks in anyway (rapid "tap to fly again" taps
+   * read as double-tap, stale cached builds, pre-existing zoom state),
+   * reasserting the viewport meta snaps iOS back to scale 1. */
+  let zoomToggle = false;
+  function assertNoZoom() {
+    const vv = window.visualViewport;
+    if (!vv || vv.scale <= 1.02) return;
+    const meta = document.querySelector('meta[name="viewport"]');
+    if (!meta) return;
+    zoomToggle = !zoomToggle;
+    meta.setAttribute("content",
+      "width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no" +
+      (zoomToggle ? "" : " "));
+  }
 
   /* ---------- physics constants (px, s, rad) ---------- */
   const G = 50;                 // gravity, px/s^2  (~1.62 m/s^2 at 31 px/m)
@@ -466,12 +482,14 @@
 
   /* ---------- boot / teardown ---------- */
 
+  let frameN = 0;
   function loop(t) {
     if (!active) return;
     const dt = Math.min((t - last) / 1000 || 0, 0.05);
     last = t;
     step(dt);
     render();
+    if ((frameN++ & 31) === 0) assertNoZoom();
     raf = requestAnimationFrame(loop);
   }
 
