@@ -106,7 +106,7 @@
     });
 
     game.stars = Array.from({ length: 90 }, () => [
-      Math.random() * W, Math.random() * H * 0.7, Math.random() < 0.2 ? 1.6 : 0.9,
+      Math.random() * W, Math.random() * H, Math.random() < 0.2 ? 1.6 : 0.9,
     ]);
   }
 
@@ -307,20 +307,33 @@
 
     // camera: zoom on the lander when near the ground
     const z = game.zoom;
-    /* At cruise altitude (z=1) the world fills the screen — thumbs only
-     * cover scenery. As the low-altitude zoom engages on touch devices,
-     * lift the camera target so the lander and pad render above the
-     * control strip instead of underneath the thumbs. */
-    const reserve = IS_TOUCH ? 300 : 0;
-    const ty = (H - reserve * Math.max(0, Math.min(1, (z - 1) / 0.6))) / 2;
+    /* Camera: centered on the lander. When the low-altitude zoom engages
+     * on touch devices, shift the view up only as far as needed to keep
+     * the ground beneath the lander clear of the control strip — and never
+     * so far that the lander crowds the top of the screen. */
     let cx = game.x, cy = game.y + 60;
     cx = Math.max(W / (2 * z), Math.min(W - W / (2 * z), cx));
-    cy = Math.max(ty / z, Math.min(H - (H - ty) / z, cy));
-    ctx.setTransform(dpr * z, 0, 0, dpr * z, dpr * (W / 2 - cx * z), dpr * (ty - cy * z));
+    cy = Math.max(H / (2 * z), Math.min(H - H / (2 * z), cy));
+    let offY = 0;
+    if (IS_TOUCH) {
+      const t = Math.max(0, Math.min(1, (z - 1) / 0.6));
+      const groundScreen = (terrainYAt(game.x) - cy) * z + H / 2;
+      // translucent controls may be grazed; lift only for real burial
+      offY = Math.min(0, (H - 130) - groundScreen) * t;
+      const landerScreen = (game.y - cy) * z + H / 2 + offY;
+      const topMargin = H * 0.18;
+      if (landerScreen < topMargin) offY += topMargin - landerScreen;
+    }
 
-    // stars
+    // stars track at half speed — parallax keeps the background readable
+    const zs = 1 + (z - 1) * 0.5;
+    ctx.setTransform(dpr * zs, 0, 0, dpr * zs,
+      dpr * (W / 2 - cx * zs), dpr * (H / 2 - cy * zs + offY * 0.5));
     ctx.fillStyle = DIM;
     for (const [sx, sy, r] of game.stars) ctx.fillRect(sx, sy, r, r);
+
+    ctx.setTransform(dpr * z, 0, 0, dpr * z,
+      dpr * (W / 2 - cx * z), dpr * (H / 2 - cy * z + offY));
 
     // terrain
     ctx.strokeStyle = WHITE;
