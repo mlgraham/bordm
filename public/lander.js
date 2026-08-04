@@ -323,6 +323,14 @@
 
   function render() {
     const dpr = window.devicePixelRatio || 1;
+    const vv = window.visualViewport;
+    if (vv && (vv.scale > 1.02 || vv.offsetLeft > 2 || vv.offsetTop > 2)) {
+      vFix.s = 1 / vv.scale;
+      vFix.x = vv.offsetLeft;
+      vFix.y = vv.offsetTop;
+    } else {
+      vFix.s = 1; vFix.x = 0; vFix.y = 0;
+    }
     ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
     ctx.fillStyle = "#121213";
     ctx.fillRect(0, 0, W, H);
@@ -349,13 +357,15 @@
 
     // stars track at half speed — parallax keeps the background readable
     const zs = 1 + (z - 1) * 0.5;
-    ctx.setTransform(dpr * zs, 0, 0, dpr * zs,
-      dpr * (W / 2 - cx * zs), dpr * (H / 2 - cy * zs + offY * 0.5));
+    ctx.setTransform(dpr * vFix.s * zs, 0, 0, dpr * vFix.s * zs,
+      dpr * (vFix.x + vFix.s * (W / 2 - cx * zs)),
+      dpr * (vFix.y + vFix.s * (H / 2 - cy * zs + offY * 0.5)));
     ctx.fillStyle = DIM;
     for (const [sx, sy, r] of game.stars) ctx.fillRect(sx, sy, r, r);
 
-    ctx.setTransform(dpr * z, 0, 0, dpr * z,
-      dpr * (W / 2 - cx * z), dpr * (H / 2 - cy * z + offY));
+    ctx.setTransform(dpr * vFix.s * z, 0, 0, dpr * vFix.s * z,
+      dpr * (vFix.x + vFix.s * (W / 2 - cx * z)),
+      dpr * (vFix.y + vFix.s * (H / 2 - cy * z + offY)));
 
     // terrain
     ctx.strokeStyle = WHITE;
@@ -432,7 +442,7 @@
 
   function drawHud() {
     const dpr = window.devicePixelRatio || 1;
-    ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+    ctx.setTransform(dpr * vFix.s, 0, 0, dpr * vFix.s, dpr * vFix.x, dpr * vFix.y);
     ctx.font = "12px ui-monospace, monospace";
     ctx.fillStyle = WHITE;
     ctx.textAlign = "left";
@@ -481,6 +491,10 @@
   }
 
   /* ---------- boot / teardown ---------- */
+
+  // Counter-zoom: when the page is zoomed anyway, render the whole game
+  // into the visible region at natural size. vFix is updated every frame.
+  const vFix = { s: 1, x: 0, y: 0 };
 
   let frameN = 0;
   function loop(t) {
