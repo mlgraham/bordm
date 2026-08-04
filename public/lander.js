@@ -17,12 +17,15 @@
   document.addEventListener("gesturestart", (e) => e.preventDefault(), { passive: false });
   document.addEventListener("gesturechange", (e) => e.preventDefault(), { passive: false });
   document.addEventListener("dblclick", (e) => e.preventDefault(), { passive: false });
+  document.addEventListener("selectstart", (e) => { if (active) e.preventDefault(); });
 
   /* Self-healing: if zoom sneaks in anyway (rapid "tap to fly again" taps
    * read as double-tap, stale cached builds, pre-existing zoom state),
    * reasserting the viewport meta snaps iOS back to scale 1. */
   let zoomToggle = false;
   function assertNoZoom() {
+    const sel = document.getSelection ? document.getSelection() : null;
+    if (sel && !sel.isCollapsed) sel.removeAllRanges();
     const vv = window.visualViewport;
     if (!vv || vv.scale <= 1.02) return;
     const meta = document.querySelector('meta[name="viewport"]');
@@ -674,6 +677,9 @@
     document.documentElement.style.touchAction = "none";
     document.body.style.touchAction = "none";
     document.body.style.overflow = "hidden";
+    document.body.style.webkitUserSelect = "none";
+    document.body.style.userSelect = "none";
+    document.body.style.webkitTouchCallout = "none";
     fit(); // measure the viewport before sizing the touch UI
     makeTouchUi();
     window.addEventListener("keydown", onKey);
@@ -703,6 +709,9 @@
     document.documentElement.style.touchAction = "";
     document.body.style.touchAction = "";
     document.body.style.overflow = "";
+    document.body.style.webkitUserSelect = "";
+    document.body.style.userSelect = "";
+    document.body.style.webkitTouchCallout = "";
     if (canvas) canvas.remove();
     if (ui) ui.remove();
     touch.nub = null;
