@@ -71,7 +71,10 @@
   function generateTerrain() {
     const n = 128;
     const pts = new Array(n + 1).fill(0);
-    const avg = H * 0.8;
+    // On touch devices the ground floor stays above the control strip even
+    // at cruise, so the full landscape reads at a glance from round start.
+    const floorY = IS_TOUCH ? H - 150 : H * 0.94;
+    const avg = IS_TOUCH ? H * 0.62 : H * 0.8;
     let disp = H * 0.18;
     pts[0] = avg + (Math.random() * 2 - 1) * disp;
     pts[n] = avg + (Math.random() * 2 - 1) * disp;
@@ -82,7 +85,7 @@
       }
       disp *= 0.58;
     }
-    const minY = H * 0.55, maxY = H * 0.94;
+    const minY = H * (IS_TOUCH ? 0.48 : 0.55), maxY = floorY;
     for (let i = 0; i <= n; i++) pts[i] = Math.min(maxY, Math.max(minY, pts[i]));
 
     game.terrain = pts.map((y, i) => [(i / n) * W, y]);
@@ -308,7 +311,7 @@
      * cover scenery. As the low-altitude zoom engages on touch devices,
      * lift the camera target so the lander and pad render above the
      * control strip instead of underneath the thumbs. */
-    const reserve = IS_TOUCH ? 240 : 0;
+    const reserve = IS_TOUCH ? 300 : 0;
     const ty = (H - reserve * Math.max(0, Math.min(1, (z - 1) / 0.6))) / 2;
     let cx = game.x, cy = game.y + 60;
     cx = Math.max(W / (2 * z), Math.min(W - W / (2 * z), cx));
