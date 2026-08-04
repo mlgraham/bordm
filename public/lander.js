@@ -655,6 +655,11 @@
       if (game.state !== "flying") resetRound();
     });
     ctx = canvas.getContext("2d");
+    // While flying, no touch anywhere may scroll or zoom the page — a thumb
+    // drifting off a button mid-flight must not become half of a pinch.
+    document.documentElement.style.touchAction = "none";
+    document.body.style.touchAction = "none";
+    document.body.style.overflow = "hidden";
     fit(); // measure the viewport before sizing the touch UI
     makeTouchUi();
     window.addEventListener("keydown", onKey);
@@ -681,6 +686,9 @@
     if (window.visualViewport) window.visualViewport.removeEventListener("resize", resize);
     window.removeEventListener("orientationchange", resize);
     document.removeEventListener("gesturestart", preventZoom);
+    document.documentElement.style.touchAction = "";
+    document.body.style.touchAction = "";
+    document.body.style.overflow = "";
     if (canvas) canvas.remove();
     if (ui) ui.remove();
     touch.nub = null;
