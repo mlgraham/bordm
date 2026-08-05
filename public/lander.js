@@ -356,7 +356,7 @@
   function toggleAutopilot() {
     apMode = !apMode;
     if (canvas) canvas.style.filter = apMode ? "invert(1)" : "";
-    if (ui) ui.style.display = apMode ? "none" : ""; // AP has the stick
+    if (ui) ui.style.display = apMode ? "none" : "flex"; // AP has the stick
   }
 
   function autopilot(dt) {
