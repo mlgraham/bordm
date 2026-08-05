@@ -76,6 +76,9 @@
   const keys = {};
   const touch = { up: false, down: false, left: false, right: false, abort: false, nub: null };
 
+  let apMode = false;   // easter egg: draw a triangle on the sky to toggle
+  let stroke = null;    // gesture recorder (canvas strokes outside the controls)
+
   const game = {
     state: "flying", // flying | landed | crashed
     x: 0, y: 0, vx: 0, vy: 0,
@@ -184,6 +187,28 @@
     const right = keys.ArrowRight || keys.KeyD || touch.right;
     const abort = keys.KeyX || touch.abort;
 
+    if (apMode && game.fuel > 0) {
+      autopilot(dt);
+      const accelAp = (game.throttle * THRUST) / mass();
+      const dirAp = game.angle + game.gimbal;
+      game.vx += accelAp * Math.sin(dirAp) * dt;
+      game.vy += (G - accelAp * Math.cos(dirAp)) * dt;
+      game.omega += -TORQUE_K * accelAp * Math.sin(game.gimbal) * dt;
+      game.omega *= Math.max(0, 1 - ANG_DAMP * dt);
+      game.angle += game.omega * dt;
+      game.x += game.vx * dt;
+      game.y += game.vy * dt;
+      game.fuel = Math.max(0, game.fuel - FUEL_BURN * game.throttle * dt);
+      if (game.x < -20) game.x = W + 20;
+      if (game.x > W + 20) game.x = -20;
+      emitExhaust(dt, accelAp, dirAp);
+      updateParticles(dt);
+      checkContact();
+      const altAp = terrainYAt(game.x) - game.y;
+      game.zoom += (((altAp < 240 * craft) ? 1.6 : 1) - game.zoom) * Math.min(1, dt * 2.5);
+      return;
+    }
+
     let gimbalTarget = 0;
     if (left) gimbalTarget = GIMBAL_MAX;    // +gimbal -> CCW torque -> nose left
     if (right) gimbalTarget = -GIMBAL_MAX;  // -gimbal -> CW torque  -> nose right
@@ -291,6 +316,69 @@
     while (a > Math.PI) a -= 2 * Math.PI;
     while (a < -Math.PI) a += 2 * Math.PI;
     return a;
+  }
+
+  /* ---------- autopilot easter egg ---------- */
+
+  function isTriangle(pts) {
+    if (pts.length < 10) return false;
+    let len = 0;
+    for (let i = 1; i < pts.length; i++) len += Math.hypot(pts[i][0] - pts[i - 1][0], pts[i][1] - pts[i - 1][1]);
+    if (len < 220) return false;
+    const closeGap = Math.hypot(pts[pts.length - 1][0] - pts[0][0], pts[pts.length - 1][1] - pts[0][1]);
+    if (closeGap > len * 0.22) return false; // must come back to the start
+    const corners = simplify(pts, len * 0.06);
+    return corners === 3;
+  }
+
+  function simplify(pts, eps) {
+    // Douglas-Peucker corner count on the closed stroke
+    const keep = new Array(pts.length).fill(false);
+    keep[0] = keep[pts.length - 1] = true;
+    const stack = [[0, pts.length - 1]];
+    while (stack.length) {
+      const [a, b] = stack.pop();
+      let dMax = 0, iMax = -1;
+      const [ax, ay] = pts[a], [bx, by] = pts[b];
+      const ab = Math.hypot(bx - ax, by - ay) || 1;
+      for (let i = a + 1; i < b; i++) {
+        const d = Math.abs((bx - ax) * (ay - pts[i][1]) - (ax - pts[i][0]) * (by - ay)) / ab;
+        if (d > dMax) { dMax = d; iMax = i; }
+      }
+      if (dMax > eps) { keep[iMax] = true; stack.push([a, iMax], [iMax, b]); }
+    }
+    // interior corners only: start/end meet at (roughly) one more corner
+    let n = 0;
+    for (let i = 1; i < pts.length - 1; i++) if (keep[i]) n++;
+    return n + 1; // the closure point is the remaining corner
+  }
+
+  function toggleAutopilot() {
+    apMode = !apMode;
+    if (canvas) canvas.style.filter = apMode ? "invert(1)" : "";
+  }
+
+  function autopilot(dt) {
+    const alt = terrainYAt(game.x) - game.y - BASE_Y * craft;
+    let pad = game.pads[0];
+    for (const p of game.pads) {
+      if (Math.abs((p.x0 + p.x1) / 2 - game.x) < Math.abs((pad.x0 + pad.x1) / 2 - game.x)) pad = p;
+    }
+    const dx = (pad.x0 + pad.x1) / 2 - game.x;
+    const over = Math.abs(dx) < (pad.x1 - pad.x0) / 2 + 10;
+    const vxDes = Math.max(-70, Math.min(70, dx * 0.4));
+    const tiltDes = Math.max(-0.3, Math.min(0.3, (vxDes - game.vx) * 0.01));
+    const aDes = 12 * (tiltDes - game.angle) - 7 * game.omega;
+    const acc = Math.max(40, (game.throttle * THRUST) / mass());
+    const sg = Math.max(-1, Math.min(1, -aDes / (TORQUE_K * acc)));
+    game.gimbal = approach(game.gimbal,
+      Math.max(-GIMBAL_MAX, Math.min(GIMBAL_MAX, Math.asin(sg))), GIMBAL_RATE * dt);
+    const vyDes = over
+      ? Math.min(45, 8 + alt * 0.22)                    // controlled descent
+      : Math.max(-40, Math.min(20, (alt - 150) * 0.3)); // hold transit altitude
+    const aUp = G + 1.4 * (game.vy - vyDes);
+    const cosT = Math.max(0.4, Math.cos(game.angle + game.gimbal));
+    game.throttle = Math.max(0, Math.min(1, (aUp * mass()) / (THRUST * cosT)));
   }
 
   /* ---------- particles ---------- */
@@ -480,6 +568,13 @@
     const g = game.gimbal / GIMBAL_MAX; // -1..1
     ctx.fillRect(92 + Math.min(0, g * 40), 37, Math.abs(g) * 40, 12);
 
+    if (apMode) {
+      ctx.textAlign = "center";
+      ctx.fillStyle = RED;
+      ctx.font = "700 13px ui-monospace, monospace";
+      if (Math.floor(performance.now() / 600) % 2) ctx.fillText("AUTOPILOT", W / 2, 28);
+    }
+
     if (game.state !== "flying") {
       ctx.textAlign = "center";
       ctx.fillStyle = game.state === "landed" ? WHITE : RED;
@@ -545,6 +640,7 @@
     };
     const hold = (b, prop) => {
       const set = (v) => (ev) => { touch[prop] = v; ev.preventDefault(); };
+      b.addEventListener("touchstart", (ev) => ev.preventDefault(), { passive: false });
       b.addEventListener("pointerdown", set(true));
       b.addEventListener("pointerup", set(false));
       b.addEventListener("pointercancel", set(false));
@@ -557,6 +653,7 @@
     };
     const drag = (track, onValue, onRelease) => {
       let held = false;
+      track.addEventListener("touchstart", (ev) => ev.preventDefault(), { passive: false });
       track.addEventListener("pointerdown", (ev) => {
         held = true;
         track.setPointerCapture(ev.pointerId);
@@ -668,9 +765,21 @@
     canvas.id = "lunarlander";
     canvas.style.cssText = "position:fixed;left:0;top:0;z-index:1000;background:#121213;touch-action:none;";
     document.body.appendChild(canvas);
-    canvas.addEventListener("pointerdown", () => {
-      if (game.state !== "flying") resetRound();
+    canvas.addEventListener("pointerdown", (e) => {
+      if (game.state !== "flying") { resetRound(); return; }
+      // controls are excluded as gesture input; sky only
+      if (IS_TOUCH && e.clientY > H - 240) return;
+      stroke = [[e.clientX, e.clientY]];
     });
+    canvas.addEventListener("pointermove", (e) => {
+      if (stroke) stroke.push([e.clientX, e.clientY]);
+    });
+    const endStroke = () => {
+      if (stroke && isTriangle(stroke)) toggleAutopilot();
+      stroke = null;
+    };
+    canvas.addEventListener("pointerup", endStroke);
+    canvas.addEventListener("pointercancel", () => { stroke = null; });
     ctx = canvas.getContext("2d");
     // While flying, no touch anywhere may scroll or zoom the page — a thumb
     // drifting off a button mid-flight must not become half of a pinch.
@@ -688,6 +797,7 @@
     if (window.visualViewport) window.visualViewport.addEventListener("resize", resize);
     window.addEventListener("orientationchange", resize);
     document.addEventListener("gesturestart", preventZoom, { passive: false });
+    canvas.addEventListener("touchstart", preventZoom, { passive: false });
     canvas.addEventListener("touchmove", preventZoom, { passive: false });
     setTimeout(resize, 400); // mobile viewport settles after load/refresh
     game.score = 0;
@@ -716,6 +826,8 @@
     if (ui) ui.remove();
     touch.nub = null;
     canvas = ctx = ui = null;
+    apMode = false;
+    stroke = null;
     if (location.hash === HASH) {
       history.replaceState(null, "", location.pathname + location.search);
     }
