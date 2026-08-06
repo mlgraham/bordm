@@ -693,7 +693,9 @@
     // buttons use between themselves; a bigger pad means finer control.
     // 9px row inset + 138px pair + 10px margin on each side leaves W - 314.
     const nubD = Math.max(64, Math.min(120, W - 314));
-    const nubR = nubD / 2, dotR = Math.round(nubR * 0.34), nubRange = nubR + 4;
+    const nubR = nubD / 2, dotR = Math.round(nubR * 0.34);
+    const nubRange = Math.round(nubR * 1.45); // full deflection just past the ring
+    const nubPct = (nubRange / nubD) * 100;   // dot % offset at full deflection
     const nubPad = document.createElement("div");
     nubPad.style.cssText =
       `position:relative;width:${nubR * 2}px;height:${nubR * 2}px;flex:none;` +
@@ -710,8 +712,8 @@
       const x = Math.max(-1, Math.min(1, (ev.clientX - r.left - r.width / 2) / nubRange));
       const y = Math.max(-1, Math.min(1, (ev.clientY - r.top - r.height / 2) / nubRange));
       touch.nub = { x, y };
-      dot.style.left = 50 + x * 32 + "%";
-      dot.style.top = 50 + y * 32 + "%";
+      dot.style.left = 50 + x * nubPct + "%";
+      dot.style.top = 50 + y * nubPct + "%";
     };
     drag(nubPad, nubValue, () => {
       touch.nub = null;
