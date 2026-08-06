@@ -359,27 +359,116 @@
     if (ui) ui.style.display = apMode ? "none" : "flex"; // AP has the stick
   }
 
-  function autopilot(dt) {
-    const alt = terrainYAt(game.x) - game.y - BASE_Y * craft;
+  function guidance(st) {
+    // Pure: same law flies the ship and draws the projections.
     let pad = game.pads[0];
     for (const p of game.pads) {
-      if (Math.abs((p.x0 + p.x1) / 2 - game.x) < Math.abs((pad.x0 + pad.x1) / 2 - game.x)) pad = p;
+      if (Math.abs((p.x0 + p.x1) / 2 - st.x) < Math.abs((pad.x0 + pad.x1) / 2 - st.x)) pad = p;
     }
-    const dx = (pad.x0 + pad.x1) / 2 - game.x;
+    const padCx = (pad.x0 + pad.x1) / 2;
+    const alt = terrainYAt(st.x) - st.y - BASE_Y * craft;
+    const dx = padCx - st.x;
     const over = Math.abs(dx) < (pad.x1 - pad.x0) / 2 + 10;
     const vxDes = Math.max(-70, Math.min(70, dx * 0.4));
-    const tiltDes = Math.max(-0.3, Math.min(0.3, (vxDes - game.vx) * 0.01));
-    const aDes = 12 * (tiltDes - game.angle) - 7 * game.omega;
-    const acc = Math.max(40, (game.throttle * THRUST) / mass());
+    const tiltDes = Math.max(-0.3, Math.min(0.3, (vxDes - st.vx) * 0.01));
+    const aDes = 12 * (tiltDes - st.angle) - 7 * st.omega;
+    const m = 1 + FUEL_MASS * (st.fuel / FUEL_MAX);
+    const acc = Math.max(40, (st.throttle * THRUST) / m);
     const sg = Math.max(-1, Math.min(1, -aDes / (TORQUE_K * acc)));
-    game.gimbal = approach(game.gimbal,
-      Math.max(-GIMBAL_MAX, Math.min(GIMBAL_MAX, Math.asin(sg))), GIMBAL_RATE * dt);
+    const gimbalTarget = Math.max(-GIMBAL_MAX, Math.min(GIMBAL_MAX, Math.asin(sg)));
     const vyDes = over
       ? Math.min(45, 8 + alt * 0.22)                    // controlled descent
       : Math.max(-40, Math.min(20, (alt - 150) * 0.3)); // hold transit altitude
-    const aUp = G + 1.4 * (game.vy - vyDes);
-    const cosT = Math.max(0.4, Math.cos(game.angle + game.gimbal));
-    game.throttle = Math.max(0, Math.min(1, (aUp * mass()) / (THRUST * cosT)));
+    const aUp = G + 1.4 * (st.vy - vyDes);
+    const cosT = Math.max(0.4, Math.cos(st.angle + st.gimbal));
+    const throttle = st.fuel > 0
+      ? Math.max(0, Math.min(1, (aUp * m) / (THRUST * cosT))) : 0;
+    return { pad, padCx, vxDes, vyDes, gimbalTarget, throttle };
+  }
+
+  function autopilot(dt) {
+    const gd = guidance(game);
+    game.gimbal = approach(game.gimbal, gd.gimbalTarget, GIMBAL_RATE * dt);
+    game.throttle = gd.throttle;
+    game.ap = gd;
+  }
+
+  function predictPath() {
+    // Forward-integrate the craft under its own guidance to touchdown.
+    const st = { x: game.x, y: game.y, vx: game.vx, vy: game.vy,
+      angle: game.angle, omega: game.omega, gimbal: game.gimbal,
+      throttle: game.throttle, fuel: game.fuel };
+    const pts = [];
+    const DT = 0.12;
+    for (let i = 0; i < 90; i++) {
+      const gd = guidance(st);
+      st.gimbal = approach(st.gimbal, gd.gimbalTarget, GIMBAL_RATE * DT);
+      st.throttle = gd.throttle;
+      const m = 1 + FUEL_MASS * (st.fuel / FUEL_MAX);
+      const acc = (st.throttle * THRUST) / m;
+      const dir = st.angle + st.gimbal;
+      st.vx += acc * Math.sin(dir) * DT;
+      st.vy += (G - acc * Math.cos(dir)) * DT;
+      st.omega += -TORQUE_K * acc * Math.sin(st.gimbal) * DT;
+      st.omega *= Math.max(0, 1 - ANG_DAMP * DT);
+      st.angle += st.omega * DT;
+      st.x += st.vx * DT;
+      st.y += st.vy * DT;
+      st.fuel = Math.max(0, st.fuel - FUEL_BURN * st.throttle * DT);
+      pts.push([st.x, st.y]);
+      if (st.y + BASE_Y * craft >= terrainYAt(st.x)) break;
+    }
+    return pts;
+  }
+
+  function drawApOverlay(z) {
+    if (!apMode || game.state !== "flying" || !game.ap) return;
+    const gd = game.ap;
+    ctx.lineWidth = 1.1 / z;
+
+    // predicted flight path, to touchdown
+    const path = predictPath();
+    if (path.length > 1) {
+      ctx.strokeStyle = DIM;
+      ctx.setLineDash([6 / z, 5 / z]);
+      ctx.beginPath();
+      ctx.moveTo(game.x, game.y);
+      for (const [px, py] of path) ctx.lineTo(px, py);
+      ctx.stroke();
+      ctx.setLineDash([]);
+      const [ex, ey] = path[path.length - 1];
+      ctx.strokeStyle = RED;
+      ctx.beginPath();
+      ctx.arc(ex, ey, 6 / z, 0, Math.PI * 2);
+      ctx.stroke();
+    }
+
+    // target pad designator
+    const p = gd.pad;
+    ctx.strokeStyle = RED;
+    ctx.beginPath();
+    ctx.moveTo(p.x0, p.y - 14 / z); ctx.lineTo(p.x0, p.y - 5 / z);
+    ctx.moveTo(p.x1, p.y - 14 / z); ctx.lineTo(p.x1, p.y - 5 / z);
+    ctx.moveTo(gd.padCx, p.y - 10 / z); ctx.lineTo(gd.padCx, p.y - 3 / z);
+    ctx.stroke();
+
+    // velocity vectors: actual (bright) vs commanded (dim)
+    const arrow = (vx, vy, color) => {
+      const ex = game.x + vx * 0.6, ey = game.y + vy * 0.6;
+      const len = Math.hypot(vx, vy);
+      if (len < 6) return;
+      const a = Math.atan2(ey - game.y, ex - game.x);
+      ctx.strokeStyle = color;
+      ctx.beginPath();
+      ctx.moveTo(game.x, game.y);
+      ctx.lineTo(ex, ey);
+      ctx.lineTo(ex - Math.cos(a - 0.4) * 7 / z, ey - Math.sin(a - 0.4) * 7 / z);
+      ctx.moveTo(ex, ey);
+      ctx.lineTo(ex - Math.cos(a + 0.4) * 7 / z, ey - Math.sin(a + 0.4) * 7 / z);
+      ctx.stroke();
+    };
+    arrow(gd.vxDes, gd.vyDes, DIM);
+    arrow(game.vx, game.vy, WHITE);
   }
 
   /* ---------- particles ---------- */
@@ -492,6 +581,7 @@
     }
     ctx.globalAlpha = 1;
 
+    drawApOverlay(z);
     if (game.state !== "crashed") drawLander(z);
     drawHud();
   }
