@@ -15,7 +15,7 @@ bordm.com
 ## How it works
 
 - Static site, no build step, no server: `public/` is deployed as-is to Cloudflare Pages.
-- The daily puzzle is derived **client-side** from the [Wikimedia pageviews API](https://wikimedia.org/api/rest_v1/) (CORS-open, keyless, finalized daily): the top-read articles from three days back are filtered for puzzle-worthiness, then one is picked with a PRNG seeded by the date — so everyone on a given calendar date gets the same puzzle and the site needs no daily updates, ever. The puzzle rolls over at each player's local midnight, like the NYT games. The clue is the article's description from the page-summary endpoint, and the derived puzzle is pinned in `localStorage` so a board never changes mid-game.
+- The daily puzzle is derived **client-side** from the [Wikimedia pageviews API](https://wikimedia.org/api/rest_v1/) (CORS-open, keyless, finalized daily): the top-read articles from a few days back (walking back up to five if a dataset is missing) are filtered for puzzle-worthiness, then one is picked by rendezvous hashing on the date — stable against dataset republications — with a five-day memory that prevents repeat answers. Everyone on a given calendar date gets the same puzzle and the site needs no daily updates, ever. The puzzle rolls over at each player's local midnight, like the NYT games. The clue is the article's description from the page-summary endpoint, and the derived puzzle is pinned in `localStorage` so a board never changes mid-game.
 - If the API is unreachable, a bundled list of idioms (picked by the same date seed) keeps the game playable offline.
 - Streaks and stats live in `localStorage`.
 

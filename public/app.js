@@ -142,6 +142,57 @@ function pickFor(key, cands) {
   return cands[rand() % cands.length];
 }
 
+/* ---------- selection v2 (cutover 2026-08-08) ----------
+ * Per the compatibility contract, v1 (seed % poolSize, 1-day variety, D-3
+ * only) remains for dates before the cutover. v2 fixes three weaknesses the
+ * 2026-08-07 incident exposed:
+ * - Rendezvous hashing: the winner is argmax of hash(date+title), so a pool
+ *   perturbation (Wikimedia republishing a dataset mid-day) only changes the
+ *   pick if the winner itself appears or vanishes — not every pick.
+ * - 5-day variety memory: candidates sharing a significant word with any of
+ *   the last five days' picks are excluded, so answers can't repeat within
+ *   a week (v1 only remembered yesterday).
+ * - Walkback: missing datasets (Aug 3 vanished for days) fall back to D-4
+ *   then D-5 before surrendering to the idiom list. */
+const V2_CUTOVER = "2026-08-08";
+
+async function candidatesBack(forDate) {
+  for (let back = 3; back <= 5; back++) {
+    try {
+      const src = minusDays(forDate, back);
+      const res = await fetch(TOP_URL(src.y, src.m, src.d), { headers: { Accept: "application/json" } });
+      if (!res.ok) continue;
+      const c = candidatesFromTop(await res.json());
+      if (c.length) return c;
+    } catch { /* try further back */ }
+  }
+  throw new Error("no pageview data in walkback window");
+}
+
+function pickRendezvous(key, cands) {
+  let best = cands[0], bestH = -1;
+  for (const c of cands) {
+    const h = xmur3("bordm-" + key + "-" + c.raw)();
+    if (h > bestH) { bestH = h; best = c; }
+  }
+  return best;
+}
+
+async function deriveV2(today, key) {
+  const cands = await candidatesBack(today);
+  const avoid = new Set();
+  await Promise.all([1, 2, 3, 4, 5].map(async (n) => {
+    const d = minusDays(today, n);
+    try {
+      const dc = await candidatesBack(d);
+      for (const w of answerWords(pickRendezvous(dateKey(d), dc).answer)) avoid.add(w);
+    } catch { /* that day contributes no exclusions */ }
+  }));
+  let pool = cands.filter((c) => !answerWords(c.answer).some((w) => avoid.has(w)));
+  if (!pool.length) pool = cands;
+  return pickRendezvous(key, pool);
+}
+
 /* COMPATIBILITY CONTRACT: the puzzle number and answer both derive from the
  * calendar date, and players compare results by number. Any change to the
  * selection pipeline (filters, blacklist, variety rule, data offset, seed)
@@ -162,6 +213,10 @@ async function loadPuzzle() {
 
   let puzzle;
   try {
+    let pick;
+    if (key >= V2_CUTOVER) {
+      pick = await deriveV2(today, key);
+    } else {
     let cands = await fetchCandidates(today);
     if (!cands.length) throw new Error("no candidates");
     /* Variety: a blockbuster can top the charts for days, so exclude
@@ -177,7 +232,8 @@ async function loadPuzzle() {
         if (varied.length) cands = varied;
       }
     } catch { /* variety data unavailable — proceed unfiltered */ }
-    const pick = pickFor(key, cands);
+    pick = pickFor(key, cands);
+    }
     let clue = pick.hint || "In the news";
     try {
       const s = await fetch(SUMMARY_URL(pick.raw), { headers: { Accept: "application/json" } });
