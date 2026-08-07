@@ -441,7 +441,7 @@ function wordStatus(word) {
       }
     }
     if (!w.tiles.some((t) => t.isVowel)) solved = true;
-    statuses.push(solved ? "🟩" : anyLocked ? "🟨" : "⬛");
+    statuses.push(solved ? "🌕" : anyLocked ? "🌗" : "🌑"); // Bordm's own share language: restore the light
   }
   return statuses;
 }

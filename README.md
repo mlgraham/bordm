@@ -2,13 +2,13 @@
 
 **[bordm.com](https://www.bordm.com)** — a daily vowel-restoration puzzle. BORDM is BOREDOM with letters missing; each day the game does the same thing to a phrase, and you put the vowels back in 4 tries.
 
-The phrase comes from what the world has been reading on Wikipedia, with the article's description as your clue. Results share Wordle-style:
+The phrase comes from what the world has been reading on Wikipedia, with the article's description as your clue. Results share in Bordm's own moon-phase language — one row per check, each word lighting up as you restore it:
 
 ```
 Bordm #2 3/4
-🟨⬛🟩⬛
-🟨⬛🟩🟨
-🟩🟩🟩🟩
+🌗🌑🌕🌑
+🌗🌑🌕🌗
+🌕🌕🌕🌕
 bordm.com
 ```
 

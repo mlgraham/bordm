@@ -5,7 +5,7 @@
   --tile-border: #3a3a3c;
   --text: #f8f8f8;
   --muted: #818384;
-  --green: #538d4e;
+  --gold: #d4a02a;
   --yellow: #b59f3b;
   --red: #a33a3a;
   --key-bg: #818384;
@@ -44,7 +44,7 @@ header {
   border-radius: 4px;
 }
 .logo .c { background: #2f2f31; border: 2px solid var(--tile-border); }
-.logo .v { background: var(--green); border: 2px solid var(--green); }
+.logo .v { background: var(--gold); border: 2px solid var(--gold); }
 
 .tagline { color: var(--muted); font-size: 12px; margin-top: 6px; }
 
@@ -112,7 +112,7 @@ main {
 .tile.slot { background: transparent; cursor: pointer; color: var(--text); }
 .tile.slot.active { border-color: #d7dadc; box-shadow: 0 0 0 1px #d7dadc inset; }
 .tile.slot.filled { border-color: #565758; }
-.tile.slot.locked { background: var(--green); border-color: var(--green); color: #fff; cursor: default; }
+.tile.slot.locked { background: var(--gold); border-color: var(--gold); color: #fff; cursor: default; }
 .tile.slot.revealed { background: var(--red); border-color: var(--red); color: #fff; }
 .tile.slot.shake { animation: shake 0.35s; }
 
@@ -158,7 +158,7 @@ main {
 .key:active { filter: brightness(1.2); }
 .key.wide { flex: 1.6 1 0; }
 .key.check {
-  background: var(--green);
+  background: var(--gold);
   font-size: 14px;
   min-width: fit-content;
   padding: 0 10px;
@@ -217,7 +217,7 @@ main {
 }
 
 .share-btn {
-  background: var(--green);
+  background: var(--gold);
   color: #fff;
   border: none;
   border-radius: 6px;
