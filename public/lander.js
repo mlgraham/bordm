@@ -799,8 +799,10 @@
     nubPad.appendChild(dot);
     const nubValue = (ev) => {
       const r = nubPad.getBoundingClientRect();
-      const x = Math.max(-1, Math.min(1, (ev.clientX - r.left - r.width / 2) / nubRange));
-      const y = Math.max(-1, Math.min(1, (ev.clientY - r.top - r.height / 2) / nubRange));
+      let x = (ev.clientX - r.left - r.width / 2) / nubRange;
+      let y = (ev.clientY - r.top - r.height / 2) / nubRange;
+      const m = Math.hypot(x, y); // clamp to the circle, not a square
+      if (m > 1) { x /= m; y /= m; }
       touch.nub = { x, y };
       dot.style.left = 50 + x * nubPct + "%";
       dot.style.top = 50 + y * nubPct + "%";
